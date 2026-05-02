@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Trade Reporta</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #FAFAFA; color: #111; font-size: 14px; line-height: 1.5; }
+
+/* HEADER */
+.hdr { position: sticky; top: 0; z-index: 100; background: #fff; border-bottom: 1px solid #EBEBEB; padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+.logo { font-size: 15px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
+.logo span { color: #999; font-weight: 400; }
+.hdr-right { display: flex; gap: 8px; align-items: center; }
+.nav-btn { background: none; border: 1px solid #EBEBEB; color: #666; font-size: 12px; font-weight: 500; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.nav-btn.on, .nav-btn:hover { border-color: #111; color: #111; }
+.add-btn { background: #111; border: none; border-radius: 6px; color: #fff; font-size: 13px; font-weight: 600; padding: 7px 14px; cursor: pointer; font-family: inherit; }
+
+/* VIEWS */
+.view { display: none; } .view.on { display: block; }
+.wrap { max-width: 680px; margin: 0 auto; padding: 28px 20px 110px; }
+.pg-title { font-size: 22px; font-weight: 700; color: #111; margin-bottom: 4px; letter-spacing: -0.5px; }
+.pg-sub { font-size: 13px; color: #999; margin-bottom: 24px; }
+
+/* CARDS */
+.card { background: #fff; border: 1px solid #EBEBEB; border-radius: 10px; padding: 20px; margin-bottom: 10px; }
+.card-title { font-size: 13px; font-weight: 700; color: #111; margin-bottom: 6px; }
+.card-sub { font-size: 13px; color: #888; line-height: 1.6; margin-bottom: 14px; }
+
+/* SECTIONS */
+.sec { background: #fff; border: 1px solid #EBEBEB; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.sec-hdr { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.sec-hdr-left { display: flex; align-items: center; gap: 10px; }
+.sec-icon { font-size: 15px; }
+.sec-title { font-size: 14px; font-weight: 600; color: #111; }
+.sec-arr { color: #ccc; font-size: 16px; transition: transform 0.15s; }
+.sec.shut .sec-arr { transform: rotate(-90deg); }
+.sec-divider { border-top: 1px solid #EBEBEB; }
+.sec-body { padding: 18px; }
+.sec.shut .sec-divider, .sec.shut .sec-body { display: none; }
+
+/* TABS */
+.tab-row { display: flex; background: #F5F5F5; border-radius: 8px; padding: 3px; margin-bottom: 14px; }
+.tab-btn { flex: 1; background: none; border: none; color: #999; font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.tab-btn.on { background: #fff; color: #111; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.tab-pane { display: none; } .tab-pane.on { display: block; }
+
+/* FIELDS */
+.frow { display: grid; gap: 10px; margin-bottom: 12px; }
+.c1 { grid-template-columns: 1fr; }
+.c2 { grid-template-columns: 1fr 1fr; }
+.c3 { grid-template-columns: 1fr 1fr 1fr; }
+@media(max-width: 480px) { .c2, .c3 { grid-template-columns: 1fr; } }
+.fld { display: flex; flex-direction: column; gap: 5px; }
+.fld label { font-size: 11px; font-weight: 600; color: #999; letter-spacing: 0.4px; text-transform: uppercase; }
+.fld input, .fld textarea { background: #fff; border: 1px solid #E5E5E5; border-radius: 6px; color: #111; font-family: inherit; font-size: 14px; padding: 9px 11px; width: 100%; outline: none; transition: border-color 0.15s; }
+.fld input:focus, .fld textarea:focus { border-color: #111; }
+.fld input::placeholder, .fld textarea::placeholder { color: #CCC; }
+.fld textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+.fld textarea.lg { min-height: 110px; }
+.divider { border: none; border-top: 1px solid #F0F0F0; margin: 14px 0; }
+
+/* BUTTONS */
+.primary { background: #111; border: none; border-radius: 6px; color: #fff; font-weight: 600; font-size: 14px; padding: 10px 18px; cursor: pointer; font-family: inherit; }
+.primary:disabled { background: #DDD; color: #999; cursor: not-allowed; }
+.secondary { background: #fff; border: 1px solid #E5E5E5; border-radius: 6px; color: #444; font-size: 13px; font-weight: 500; padding: 8px 14px; cursor: pointer; font-family: inherit; }
+.secondary:hover { border-color: #999; }
+.text-btn { background: none; border: none; color: #111; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
+
+/* STATUS */
+.status-pill { font-size: 12px; font-weight: 500; padding: 8px 12px; border-radius: 6px; margin-top: 8px; }
+.status-pill.work { background: #FFFBEB; color: #92400E; }
+.status-pill.done { background: #F0FDF4; color: #16A34A; }
+.status-pill.err { background: #FEF2F2; color: #DC2626; }
+
+/* TYPE SELECTOR */
+.type-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.type-opt { background: #fff; border: 1.5px solid #EBEBEB; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: all 0.15s; }
+.type-opt.sel { border-color: #111; background: #F9F9F9; }
+.type-opt .t-icon { font-size: 18px; margin-bottom: 6px; }
+.type-opt .t-name { font-size: 14px; font-weight: 600; color: #111; margin-bottom: 2px; }
+.type-opt .t-desc { font-size: 11px; color: #999; }
+
+/* JOBS */
+.job-card { background: #fff; border: 1px solid #EBEBEB; border-radius: 10px; padding: 16px 18px; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: border-color 0.15s; }
+.job-card:hover { border-color: #CCC; }
+.jc-ref { font-size: 11px; color: #999; font-weight: 500; margin-bottom: 3px; }
+.jc-addr { font-size: 15px; font-weight: 600; color: #111; margin-bottom: 2px; }
+.jc-meta { font-size: 12px; color: #999; }
+.jc-right { display: flex; align-items: center; gap: 8px; }
+.badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; }
+.b-roof { background: #F5F5F5; color: #555; }
+.b-leak { background: #F5F5F5; color: #555; }
+.b-done { background: #F0FDF4; color: #16A34A; }
+.b-draft { background: #F5F5F5; color: #999; }
+
+/* VOICE */
+.rec-box { border: 1px solid #EBEBEB; border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+.rec-top { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; }
+.rec-label { font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.4px; }
+.rec-btn { display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #E5E5E5; border-radius: 6px; color: #111; font-size: 13px; font-weight: 600; padding: 7px 13px; cursor: pointer; font-family: inherit; }
+.rec-btn.recording { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; }
+.rec-dot { width: 7px; height: 7px; border-radius: 50%; background: #DC2626; flex-shrink: 0; }
+.rec-btn.recording .rec-dot { animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.voice-notes { border-top: 1px solid #EBEBEB; padding: 14px; display: none; }
+.voice-notes.on { display: block; }
+
+/* PHOTOS */
+.drop-zone { border: 1.5px dashed #DDD; border-radius: 8px; padding: 24px 20px; text-align: center; cursor: pointer; position: relative; transition: all 0.15s; }
+.drop-zone:hover { border-color: #999; background: #FAFAFA; }
+.drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 14px; }
+.ph { border: 1px solid #EBEBEB; border-radius: 8px; overflow: hidden; position: relative; background: #F9F9F9; }
+.ph img { width: 100%; height: 85px; object-fit: cover; display: block; }
+.ph-num { position: absolute; top: 6px; left: 6px; background: #111; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+.ph-del { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.5); border: none; color: #fff; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+.ph-cap { background: #fff; border: none; border-top: 1px solid #EBEBEB; color: #555; font-size: 11px; padding: 6px 8px; width: 100%; font-family: inherit; outline: none; }
+
+/* GENERATE BAR */
+.gen-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 200; background: #fff; border-top: 1px solid #EBEBEB; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+.gen-info { font-size: 12px; color: #999; }
+.gen-info strong { color: #111; font-size: 14px; display: block; }
+
+/* WO */
+.wo-row { display: flex; gap: 10px; align-items: flex-start; }
+.wo-txt { flex: 1; background: #fff; border: 1px solid #E5E5E5; border-radius: 6px; color: #111; font-family: inherit; font-size: 14px; padding: 9px 11px; min-height: 90px; resize: vertical; line-height: 1.5; outline: none; }
+.wo-txt:focus { border-color: #111; }
+.wo-txt::placeholder { color: #CCC; }
+.wo-side { display: flex; flex-direction: column; gap: 6px; }
+
+/* EMPTY */
+.empty { text-align: center; padding: 60px 20px; }
+.empty-icon { font-size: 40px; margin-bottom: 14px; }
+.empty-title { font-size: 17px; font-weight: 700; color: #111; margin-bottom: 6px; }
+.empty-sub { font-size: 13px; color: #999; line-height: 1.6; margin-bottom: 22px; }
+
+/* AI BTN */
+.ai-btn { background: #111; border: none; border-radius: 6px; color: #fff; font-size: 13px; font-weight: 600; padding: 9px 16px; cursor: pointer; font-family: inherit; margin-top: 10px; display: inline-block; }
+.ai-btn:disabled { background: #CCC; cursor: not-allowed; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #111; color: #fff; font-size: 13px; font-weight: 500; padding: 9px 16px; border-radius: 8px; z-index: 500; opacity: 0; transition: opacity 0.25s; pointer-events: none; white-space: nowrap; }
+.toast.on { opacity: 1; }
+
+/* EXPANDED */
+.expanded-sec { display: none; } .expanded-sec.on { display: block; }
+
+/* KEY INPUT */
+.key-row { display: flex; gap: 10px; }
+.key-input { flex: 1; background: #fff; border: 1px solid #E5E5E5; border-radius: 6px; color: #111; font-family: inherit; font-size: 14px; padding: 9px 11px; outline: none; }
+.key-input:focus { border-color: #111; }
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo">Trade Reporta <span>by JFR</span></div>
+  <div class="hdr-right">
+    <button class="nav-btn on" id="nav-jobs" onclick="goView('jobs')">Reports</button>
+    <button class="nav-btn" id="nav-settings" onclick="goView('settings')">Settings</button>
+    <button class="add-btn" onclick="newJob()">+ New</button>
+  </div>
+</header>
+
+<div class="toast" id="toast"></div>
+
+<!-- JOBS -->
+<div class="view on" id="view-jobs">
+  <div class="wrap">
+    <div class="pg-title">Reports</div>
+    <div class="pg-sub">All your inspection reports</div>
+    <div id="jobs-list"></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="view" id="view-settings">
+  <div class="wrap">
+    <div class="pg-title">Settings</div>
+    <div class="pg-sub">Configure your account</div>
+    <div class="card">
+      <div class="card-title">Claude API Key</div>
+      <div class="card-sub">Stored in your browser only. Powers AI features — work order reading, report writing.<br>Get yours at <strong>console.anthropic.com</strong> → API Keys → Create Key.</div>
+      <div class="key-row">
+        <input type="password" class="key-input" id="key-input" placeholder="sk-ant-api03-...">
+        <button class="primary" onclick="saveKey()">Save</button>
+      </div>
+      <div id="key-status"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">About</div>
+      <div style="font-size:13px;color:#888;line-height:1.8;">
+        Trade Reporta v1.0<br>
+        Built by JFR Roofing Pty Ltd · ABN: 46 660 637 614<br>
+        NSW Licence: 381433C · jack@jfrroofing.com
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FORM -->
+<div class="view" id="view-form">
+  <div class="wrap">
+    <button onclick="goView('jobs')" style="background:none;border:none;color:#999;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:18px;padding:0;font-family:inherit;">← Back</button>
+    <div class="pg-title" id="form-title">New Report</div>
+    <div class="pg-sub">Import work order · Record notes · Add photos · Generate PDF</div>
+
+    <!-- TYPE -->
+    <div class="type-row">
+      <div class="type-opt sel" id="type-roof" onclick="setType('roof')">
+        <div class="t-icon">🏠</div>
+        <div class="t-name">Roof Inspection</div>
+        <div class="t-desc">Storm, hail, insurance</div>
+      </div>
+      <div class="type-opt" id="type-leak" onclick="setType('leak')">
+        <div class="t-icon">💧</div>
+        <div class="t-name">Leak Investigation</div>
+        <div class="t-desc">Water ingress, point of entry</div>
+      </div>
+    </div>
+
+    <!-- JOB DETAILS -->
+    <div class="sec" id="sec-details">
+      <div class="sec-hdr" onclick="toggleSec('sec-details')">
+        <div class="sec-hdr-left"><span class="sec-icon">📋</span><span class="sec-title">Job Details</span></div>
+        <span class="sec-arr">⌄</span>
+      </div>
+      <div class="sec-divider"></div>
+      <div class="sec-body">
+        <div class="tab-row">
+          <button class="tab-btn on" id="tab-import-btn" onclick="switchTab('import')">Import Work Order</button>
+          <button class="tab-btn" id="tab-manual-btn" onclick="switchTab('manual')">Enter Manually</button>
+        </div>
+        <div class="tab-pane on" id="tab-import">
+          <p style="font-size:13px;color:#888;margin-bottom:10px;line-height:1.5;">Paste the work order text — AI fills in all job details automatically.</p>
+          <div class="wo-row">
+            <textarea class="wo-txt" id="wo-text" placeholder="Paste work order text here..."></textarea>
+            <div class="wo-side">
+              <button class="primary" id="wo-btn" onclick="parseWO()" style="white-space:nowrap;font-size:13px;">✦ Auto-Fill</button>
+              <button class="secondary" onclick="document.getElementById('pdf-in').click()">PDF</button>
+              <input type="file" id="pdf-in" accept=".pdf,application/pdf" style="display:none" onchange="handlePDF(event)">
+            </div>
+          </div>
+          <div id="wo-status"></div>
+          <p style="font-size:11px;color:#CCC;margin-top:8px;">Tip: Open PDF → select all text → copy → paste above</p>
+        </div>
+        <div class="tab-pane" id="tab-manual">
+          <p style="font-size:13px;color:#888;margin-bottom:10px;">No work order? Fill in the details below.</p>
+        </div>
+        <div class="divider"></div>
+        <div class="frow c2">
+          <div class="fld"><label>Client</label><input id="f-client" placeholder="e.g. ARC Projects"></div>
+          <div class="fld"><label>Reference / PO</label><input id="f-ref" placeholder="e.g. PO133433-RP01-001"></div>
+        </div>
+        <div class="frow c2">
+          <div class="fld"><label>Case Manager</label><input id="f-cm" placeholder="Name"></div>
+          <div class="fld"><label>Case Manager Email</label><input id="f-cmemail" placeholder="Email"></div>
+        </div>
+        <div class="frow c2">
+          <div class="fld"><label>Insurer</label><input id="f-insurer" placeholder="e.g. AAI Limited"></div>
+          <div class="fld"><label>Insurance Ref</label><input id="f-insurerref" placeholder="Claim number"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="frow c2">
+          <div class="fld"><label>Customer Name</label><input id="f-customer" placeholder="Full name"></div>
+          <div class="fld"><label>Customer Phone</label><input id="f-custphone" placeholder="0400 000 000"></div>
+        </div>
+        <div class="frow c1">
+          <div class="fld"><label>Property Address</label><input id="f-address" placeholder="Full address including suburb and postcode"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="frow c3">
+          <div class="fld"><label>Date</label><input id="f-date" type="date"></div>
+          <div class="fld"><label>Inspector</label><input id="f-inspector" placeholder="Name"></div>
+          <div class="fld"><label>Weather</label><input id="f-weather" placeholder="e.g. Overcast"></div>
+        </div>
+        <div class="frow c2">
+          <div class="fld"><label>Method</label><input id="f-method" value="Walk Over — Internal & External"></div>
+          <div class="fld"><label>Roof Material</label><input id="f-roofmat" placeholder="e.g. Colorbond / Decromastic"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VOICE -->
+    <div class="sec" id="sec-voice">
+      <div class="sec-hdr" onclick="toggleSec('sec-voice')">
+        <div class="sec-hdr-left"><span class="sec-icon">🎙</span><span class="sec-title">Voice Notes</span></div>
+        <span class="sec-arr">⌄</span>
+      </div>
+      <div class="sec-divider"></div>
+      <div class="sec-body">
+        <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.5;">Record your inspection — AI writes the formal report sections from your voice.</p>
+        <div class="rec-box">
+          <div class="rec-top">
+            <span class="rec-label">🎙 Recorder</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span id="rec-time" style="font-size:13px;font-weight:600;color:#DC2626;display:none;">0:00</span>
+              <button class="rec-btn" id="rec-btn" onclick="toggleRec()">
+                <span class="rec-dot"></span> Record
+              </button>
+            </div>
+          </div>
+          <div id="voice-status"></div>
+          <div class="voice-notes" id="voice-notes">
+            <div class="fld" style="margin-bottom:10px;">
+              <label>Notes — edit freely</label>
+              <textarea id="voice-text" style="background:#FAFAFA;border:1px solid #EBEBEB;border-radius:6px;color:#111;font-family:inherit;font-size:14px;line-height:1.5;padding:9px 11px;width:100%;resize:vertical;min-height:90px;outline:none;" placeholder="Your notes..."></textarea>
+            </div>
+            <button class="ai-btn" id="expand-btn" onclick="expandNotes()">✦ Expand into Report Sections</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Or type notes directly</label>
+          <textarea id="f-notes" class="lg" placeholder="What you saw on site, cause of damage, recommendations..."></textarea>
+        </div>
+        <div id="expand-typed-wrap" style="display:none;">
+          <button class="ai-btn" onclick="expandFromTyped()">✦ Expand Notes into Report Sections</button>
+        </div>
+        <div id="expand-status"></div>
+      </div>
+    </div>
+
+    <!-- AI SECTIONS -->
+    <div class="sec expanded-sec" id="sec-expanded">
+      <div class="sec-hdr" onclick="toggleSec('sec-expanded')">
+        <div class="sec-hdr-left"><span class="sec-icon">✦</span><span class="sec-title">Report Sections</span></div>
+        <span class="sec-arr">⌄</span>
+      </div>
+      <div class="sec-divider"></div>
+      <div class="sec-body">
+        <p style="font-size:13px;color:#888;margin-bottom:14px;">Review and edit each section before generating the PDF.</p>
+        <div class="fld" style="margin-bottom:12px;"><label>Scope of Works</label><textarea id="ai-scope" class="lg"></textarea></div>
+        <div class="fld" style="margin-bottom:12px;"><label>Findings (Area | Observation | Photo ref — one per line)</label><textarea id="ai-findings" style="min-height:130px;background:#fff;border:1px solid #E5E5E5;border-radius:6px;color:#111;font-family:inherit;font-size:14px;padding:9px 11px;width:100%;resize:vertical;line-height:1.5;outline:none;"></textarea></div>
+        <div class="fld" id="ai-entry-wrap" style="margin-bottom:12px;display:none;"><label>Point of Water Entry</label><textarea id="ai-entry"></textarea></div>
+        <div class="fld" style="margin-bottom:12px;"><label>Causation</label><textarea id="ai-causation" class="lg"></textarea></div>
+        <div class="fld" style="margin-bottom:12px;"><label>Maintenance Items</label><textarea id="ai-maint"></textarea></div>
+        <div class="fld" style="margin-bottom:12px;"><label>Recommendations (Priority: Action — one per line)</label><textarea id="ai-recs"></textarea></div>
+        <div class="fld" style="margin-bottom:12px;"><label>Conclusion</label><textarea id="ai-conclusion" class="lg"></textarea></div>
+      </div>
+    </div>
+
+    <!-- PHOTOS -->
+    <div class="sec" id="sec-photos">
+      <div class="sec-hdr" onclick="toggleSec('sec-photos')">
+        <div class="sec-hdr-left"><span class="sec-icon">📷</span><span class="sec-title">Site Photos</span></div>
+        <span class="sec-arr">⌄</span>
+      </div>
+      <div class="sec-divider"></div>
+      <div class="sec-body">
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" accept="image/*" multiple onchange="addPhotos(event)">
+          <div style="font-size:28px;margin-bottom:8px;">📷</div>
+          <div style="font-size:14px;font-weight:600;color:#111;margin-bottom:4px;">Add photos</div>
+          <div style="font-size:12px;color:#999;">Tap to select or drag and drop</div>
+        </div>
+        <div class="photo-grid" id="photo-grid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GENERATE BAR -->
+<div class="gen-bar" id="gen-bar" style="display:none;">
+  <div class="gen-info">
+    <strong id="gen-name">New Report</strong>
+    <div id="gen-status"></div>
+  </div>
+  <button class="primary" id="gen-btn" onclick="generate()" style="font-size:14px;padding:11px 22px;">Generate PDF</button>
+</div>
+
+<script>
+let jobs = JSON.parse(localStorage.getItem('tr_jobs') || '[]');
+let cid = null, jtype = 'roof', photos = [], busy = false;
+let mrec = null, achunks = [], rtimer = null, rsecs = 0;
+
+const API = 'https://api.anthropic.com/v1/messages';
+const getKey = () => localStorage.getItem('tr_key') || '';
+const hdrs = () => ({
+  'Content-Type': 'application/json',
+  'x-api-key': getKey(),
+  'anthropic-version': '2023-06-01',
+  'anthropic-dangerous-direct-browser-access': 'true'
+});
+
+window.addEventListener('load', () => {
+  const k = getKey();
+  if (k) {
+    document.getElementById('key-input').value = k;
+    setPill('key-status', '✓ API key saved', 'done');
+  } else {
+    setTimeout(() => showToast('Add your API key in Settings to enable AI'), 1200);
+  }
+  renderJobs();
+
+  // PDF.js
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; };
+  document.head.appendChild(s);
+
+  document.getElementById('f-notes').addEventListener('input', function() {
+    document.getElementById('expand-typed-wrap').style.display = this.value ? 'block' : 'none';
+  });
+
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = '#111'; });
+  dz.addEventListener('dragleave', () => { dz.style.borderColor = '#DDD'; });
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.style.borderColor = '#DDD';
+    Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).forEach(readPhoto);
+  });
+});
+
+function goView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('on'));
+  document.getElementById('view-' + v).classList.add('on');
+  document.getElementById('gen-bar').style.display = v === 'form' ? 'flex' : 'none';
+  ['jobs','settings'].forEach(n => document.getElementById('nav-' + n).classList.toggle('on', n === v));
+  if (v === 'jobs') renderJobs();
+  window.scrollTo(0, 0);
+}
+
+function toggleSec(id) { document.getElementById(id).classList.toggle('shut'); }
+
+function switchTab(t) {
+  ['import','manual'].forEach(n => {
+    document.getElementById('tab-' + n + '-btn').classList.toggle('on', n === t);
+    document.getElementById('tab-' + n).classList.toggle('on', n === t);
+  });
+}
+
+function setType(t) {
+  jtype = t;
+  document.getElementById('type-roof').classList.toggle('sel', t === 'roof');
+  document.getElementById('type-leak').classList.toggle('sel', t === 'leak');
+  document.getElementById('ai-entry-wrap').style.display = t === 'leak' ? 'block' : 'none';
+}
+
+function setPill(id, msg, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = msg ? '<div class="status-pill ' + (type||'') + '">' + msg + '</div>' : '';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast on';
+  setTimeout(() => t.className = 'toast', 2500);
+}
+
+function g(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+function sv(id, v) { const el = document.getElementById(id); if (el) el.value = v || ''; }
+
+function saveKey() {
+  const k = document.getElementById('key-input').value.trim();
+  if (!k.startsWith('sk-ant-')) { setPill('key-status', 'Invalid — key should start with sk-ant-', 'err'); return; }
+  localStorage.setItem('tr_key', k);
+  setPill('key-status', '✓ API key saved — AI features active', 'done');
+  showToast('API key saved');
+}
+
+function saveJobs() { localStorage.setItem('tr_jobs', JSON.stringify(jobs)); }
+
+function renderJobs() {
+  const el = document.getElementById('jobs-list');
+  if (!jobs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No reports yet</div><div class="empty-sub">Create your first inspection report — import a work order, record your notes and generate a professional PDF.</div><button class="primary" onclick="newJob()" style="font-size:14px;padding:11px 22px;">+ New Report</button></div>';
+    return;
+  }
+  el.innerHTML = jobs.slice().reverse().map(j => `
+    <div class="job-card" onclick="openJob('${j.id}')">
+      <div>
+        <div class="jc-ref">${j.ref || 'No reference'} &nbsp;·&nbsp; ${j.type === 'roof' ? 'Roof Inspection' : 'Leak Investigation'}</div>
+        <div class="jc-addr">${j.address || 'No address'}</div>
+        <div class="jc-meta">${j.customer || '—'} &nbsp;·&nbsp; ${j.date || '—'} &nbsp;·&nbsp; ${j.inspector || '—'}</div>
+      </div>
+      <div class="jc-right">
+        <span class="badge ${j.status === 'done' ? 'b-done' : 'b-draft'}">${j.status === 'done' ? 'Complete' : 'Draft'}</span>
+        <span style="color:#CCC;font-size:18px;">›</span>
+      </div>
+    </div>`).join('');
+}
+
+function getFormData() {
+  return {
+    client: g('f-client'), ref: g('f-ref'), cm: g('f-cm'), cmemail: g('f-cmemail'),
+    insurer: g('f-insurer'), insurerref: g('f-insurerref'), customer: g('f-customer'),
+    custphone: g('f-custphone'), address: g('f-address'), date: g('f-date'),
+    inspector: g('f-inspector'), weather: g('f-weather'), method: g('f-method'),
+    roofmat: g('f-roofmat'), notes: g('f-notes'),
+    aiScope: g('ai-scope'), aiFindings: g('ai-findings'), aiEntry: g('ai-entry'),
+    aiCausation: g('ai-causation'), aiMaint: g('ai-maint'), aiRecs: g('ai-recs'), aiConclusion: g('ai-conclusion'),
+  };
+}
+
+function saveJob(status) {
+  const f = getFormData();
+  const d = { id: cid, type: jtype, status: status || 'draft', photos, ...f };
+  const i = jobs.findIndex(j => j.id === cid);
+  if (i >= 0) jobs[i] = d; else jobs.push(d);
+  saveJobs();
+}
+
+function clearForm() {
+  ['client','ref','cm','cmemail','insurer','insurerref','customer','custphone','address','inspector','weather','roofmat','notes'].forEach(f => sv('f-' + f, ''));
+  ['scope','findings','entry','causation','maint','recs','conclusion'].forEach(f => sv('ai-' + f, ''));
+  sv('f-date', new Date().toISOString().split('T')[0]);
+  sv('f-method', 'Walk Over — Internal & External');
+  sv('wo-text', ''); sv('voice-text', '');
+  document.getElementById('photo-grid').innerHTML = '';
+  document.getElementById('voice-notes').classList.remove('on');
+  document.getElementById('sec-expanded').classList.remove('on');
+  document.getElementById('voice-status').innerHTML = '';
+  document.getElementById('wo-status').innerHTML = '';
+  document.getElementById('expand-status').innerHTML = '';
+  document.getElementById('expand-typed-wrap').style.display = 'none';
+  document.getElementById('gen-status').innerHTML = '';
+  switchTab('import');
+  photos = [];
+}
+
+function newJob() {
+  cid = Date.now().toString(); jtype = 'roof';
+  clearForm(); setType('roof');
+  document.getElementById('form-title').textContent = 'New Report';
+  document.getElementById('gen-name').textContent = 'New Report';
+  goView('form');
+}
+
+function openJob(id) {
+  const j = jobs.find(j => j.id === id); if (!j) return;
+  cid = id; jtype = j.type || 'roof'; photos = j.photos || [];
+  clearForm(); setType(jtype);
+  const fields = ['client','ref','cm','cmemail','insurer','insurerref','customer','custphone','address','date','inspector','weather','method','roofmat','notes'];
+  fields.forEach(f => sv('f-' + f, j[f] || ''));
+  ['scope','findings','entry','causation','maint','recs','conclusion'].forEach(f => sv('ai-' + f, j['ai' + f.charAt(0).toUpperCase() + f.slice(1)] || ''));
+  if (j.aiScope) { document.getElementById('sec-expanded').classList.add('on'); }
+  renderPhotos();
+  const addr = j.address || 'Report';
+  document.getElementById('form-title').textContent = addr;
+  document.getElementById('gen-name').textContent = addr;
+  goView('form');
+}
+
+async function parseWO() {
+  if (!getKey()) { goView('settings'); showToast('Add API key in Settings first'); return; }
+  const text = g('wo-text').trim();
+  if (!text) { showToast('Paste a work order first'); return; }
+  document.getElementById('wo-btn').disabled = true;
+  setPill('wo-status', 'Reading work order...', 'work');
+  try {
+    const res = await fetch(API, { method: 'POST', headers: hdrs(), body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514', max_tokens: 800,
+      messages: [{ role: 'user', content: 'Extract job details from this work order. Return ONLY JSON (no markdown):\n{"client":"","ref":"","cm":"","cmemail":"","insurer":"","insurerref":"","customer":"","custphone":"","address":"","type":"roof or leak","roofmat":""}\n\nWork order:\n' + text }]
+    })});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const p = JSON.parse(data.content[0].text.replace(/```json|```/g,'').trim());
+    const map = { client: p.client, ref: p.ref, cm: p.cm, cmemail: p.cmemail, insurer: p.insurer, insurerref: p.insurerref, customer: p.customer, custphone: p.custphone, address: p.address, roofmat: p.roofmat };
+    Object.entries(map).forEach(([k, v]) => { if (v) sv('f-' + k, v); });
+    if (p.type === 'leak' || p.type === 'roof') setType(p.type);
+    if (p.address) { document.getElementById('form-title').textContent = p.address; document.getElementById('gen-name').textContent = p.address; }
+    setPill('wo-status', '✓ Job details filled in — review below', 'done');
+    showToast('Work order imported');
+    saveJob();
+  } catch(e) { setPill('wo-status', 'Error: ' + e.message, 'err'); }
+  document.getElementById('wo-btn').disabled = false;
+}
+
+async function handlePDF(e) {
+  const file = e.target.files[0]; if (!file) return;
+  e.target.value = '';
+  setPill('wo-status', 'Reading PDF...', 'work');
+  try {
+    const ab = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      text += tc.items.map(item => item.str).join(' ') + '\n';
+    }
+    if (!text.trim()) { setPill('wo-status', 'No text found — paste the text manually', 'err'); return; }
+    sv('wo-text', text.trim());
+    setPill('wo-status', 'PDF read — tap Auto-Fill to extract details', 'done');
+  } catch(e) { setPill('wo-status', 'Could not read PDF: ' + e.message, 'err'); }
+}
+
+async function toggleRec() {
+  if (mrec && mrec.state === 'recording') {
+    mrec.stop(); clearInterval(rtimer);
+    document.getElementById('rec-btn').classList.remove('recording');
+    document.getElementById('rec-btn').innerHTML = '<span class="rec-dot"></span> Record';
+    document.getElementById('rec-time').style.display = 'none';
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    achunks = [];
+    mrec = new MediaRecorder(stream);
+    mrec.ondataavailable = e => achunks.push(e.data);
+    mrec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      document.getElementById('voice-notes').classList.add('on');
+      setPill('voice-status', 'Recording saved — tap Expand to write your report', 'done');
+    };
+    mrec.start();
+    document.getElementById('rec-btn').classList.add('recording');
+    document.getElementById('rec-btn').innerHTML = '<span class="rec-dot"></span> Stop';
+    document.getElementById('rec-time').style.display = 'block';
+    rsecs = 0;
+    rtimer = setInterval(() => {
+      rsecs++;
+      const m = Math.floor(rsecs/60), s = rsecs % 60;
+      document.getElementById('rec-time').textContent = m + ':' + String(s).padStart(2,'0');
+    }, 1000);
+    setPill('voice-status', 'Recording...', 'work');
+  } catch(e) { setPill('voice-status', 'Microphone access denied — type notes instead', 'err'); }
+}
+
+async function doExpand(notes) {
+  if (!getKey()) { goView('settings'); showToast('Add API key in Settings first'); return; }
+  if (!notes.trim()) { showToast('Add some notes first'); return; }
+  busy = true;
+  document.getElementById('gen-btn').disabled = true;
+  setPill('expand-status', 'AI writing your report sections...', 'work');
+  const type = jtype === 'roof' ? 'Roof Inspection' : 'Leak Investigation';
+  const ep = jtype === 'leak' ? 'numbered entry points' : 'N/A';
+  const addr = g('f-address') || 'the property';
+  try {
+    const res = await fetch(API, { method: 'POST', headers: hdrs(), body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+      messages: [{ role: 'user', content: 'Write professional ' + type + ' Report sections for JFR Roofing Pty Ltd (NSW Licence 381433C) at ' + addr + '.\n\nInspector notes:\n' + notes + '\n\nReturn ONLY JSON (no markdown):\n{"scope":"2 sentences","findings":"Area | Observation | Photos\\nArea | Observation | Photos","entry":"' + ep + '","causation":"2-3 paragraphs","maintenance":"items or Nil","recommendations":"Immediate: action\\nShort Term: action\\nLong Term: action","conclusion":"2 paragraphs"}\n\nBe specific, factual, professional. No repetition.' }]
+    })});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const p = JSON.parse(data.content[0].text.replace(/```json|```/g,'').trim());
+    sv('ai-scope', p.scope || '');
+    sv('ai-findings', p.findings || '');
+    sv('ai-entry', p.entry || '');
+    sv('ai-causation', p.causation || '');
+    sv('ai-maint', p.maintenance || '');
+    sv('ai-recs', p.recommendations || '');
+    sv('ai-conclusion', p.conclusion || '');
+    document.getElementById('sec-expanded').classList.add('on');
+    document.getElementById('sec-expanded').style.display = 'block';
+    setPill('expand-status', '✓ Report sections written — review below then generate PDF', 'done');
+    showToast('Report sections generated');
+    saveJob();
+  } catch(e) { setPill('expand-status', 'Error: ' + e.message, 'err'); }
+  busy = false;
+  document.getElementById('gen-btn').disabled = false;
+}
+
+function expandNotes() { doExpand((g('voice-text') + '\n' + g('f-notes')).trim()); }
+function expandFromTyped() { doExpand(g('f-notes').trim()); }
+
+function readPhoto(file) {
+  const r = new FileReader();
+  r.onload = ev => { photos.push({ url: ev.target.result, cap: '' }); renderPhotos(); };
+  r.readAsDataURL(file);
+}
+
+function addPhotos(e) { Array.from(e.target.files).forEach(readPhoto); e.target.value = ''; }
+
+function renderPhotos() {
+  document.getElementById('photo-grid').innerHTML = photos.map((p, i) => `
+    <div class="ph">
+      <img src="${p.url}" alt="Photo ${i+1}">
+      <span class="ph-num">${i+1}</span>
+      <button class="ph-del" onclick="removePhoto(${i})">×</button>
+      <input class="ph-cap" value="${p.cap}" placeholder="Caption..." onchange="photos[${i}].cap=this.value">
+    </div>`).join('');
+}
+
+function removePhoto(i) { photos.splice(i, 1); renderPhotos(); }
+
+async function generate() {
+  if (!g('f-address') && !g('f-client')) { showToast('Fill in address or client first'); return; }
+  if (!getKey()) { goView('settings'); showToast('Add API key in Settings first'); return; }
+  busy = true;
+  document.getElementById('gen-btn').disabled = true;
+  setPill('gen-status', 'Generating report...', 'work');
+  saveJob();
+
+  let scope = g('ai-scope'), findings = g('ai-findings'), entry = g('ai-entry');
+  let causation = g('ai-causation'), maint = g('ai-maint'), recs = g('ai-recs'), conclusion = g('ai-conclusion');
+  const notes = (g('voice-text') + '\n' + g('f-notes')).trim();
+
+  if (notes && !scope) {
+    setPill('gen-status', 'AI writing report...', 'work');
+    const type = jtype === 'roof' ? 'Roof Inspection' : 'Leak Investigation';
+    const ep = jtype === 'leak' ? 'numbered' : 'N/A';
+    const addr = g('f-address') || 'the property';
+    try {
+      const res = await fetch(API, { method: 'POST', headers: hdrs(), body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+        messages: [{ role: 'user', content: 'Write ' + type + ' sections for JFR Roofing at ' + addr + '.\nNotes: ' + notes + '\nReturn ONLY JSON: {"scope":"","findings":"Area|Observation|Photos\\nArea|Observation|Photos","entry":"' + ep + '","causation":"","maintenance":"","recommendations":"Immediate: x\\nShort Term: x\\nLong Term: x","conclusion":""}' }]
+      })});
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      const p = JSON.parse(data.content[0].text.replace(/```json|```/g,'').trim());
+      scope = p.scope; findings = p.findings; entry = p.entry;
+      causation = p.causation; maint = p.maintenance; recs = p.recommendations; conclusion = p.conclusion;
+    } catch(e) {
+      setPill('gen-status', 'Error: ' + e.message, 'err');
+      busy = false; document.getElementById('gen-btn').disabled = false; return;
+    }
+  }
+
+  buildReport(getFormData(), jtype, scope, findings, entry, causation, maint, recs, conclusion, photos);
+  setPill('gen-status', '✓ Report opened — Print or Save as PDF', 'done');
+  saveJob('done'); showToast('Report generated');
+  busy = false; document.getElementById('gen-btn').disabled = false;
+}
+
+function buildReport(f, type, scope, findings, entry, causation, maint, recs, conclusion, photos) {
+  const title = type === 'roof' ? 'ROOF INSPECTION REPORT' : 'LEAK INVESTIGATION REPORT';
+  const sub = type === 'roof' ? 'Insurance & Strata — Roof Assessment' : 'Insurance & Strata — Water Ingress Investigation';
+
+  const kv = (l, v, i) => !v ? '' :
+    '<tr style="background:' + (i%2===0?'#fff':'#FAFAFA') + '"><td style="padding:8px 12px;border:1px solid #EBEBEB;font-size:11px;font-weight:600;color:#999;width:130px;text-transform:uppercase;letter-spacing:0.3px">' + l + '</td><td style="padding:8px 12px;border:1px solid #EBEBEB;font-size:13px;color:#111">' + v + '</td></tr>';
+
+  const kvs = [
+    kv('Client', f.client, 0), kv('Reference', f.ref, 1),
+    kv('Case Manager', f.cm + (f.cmemail ? ' · ' + f.cmemail : ''), 2),
+    kv('Insurance', f.insurer + (f.insurerref ? ' (Ref: ' + f.insurerref + ')' : ''), 3),
+    kv('Customer', f.customer, 4), kv('Phone', f.custphone, 5),
+    kv('Address', f.address, 6), kv('Date', f.date, 7),
+    kv('Inspector', f.inspector, 8), kv('Weather', f.weather, 9),
+    kv('Method', f.method, 10), kv('Roof Material', f.roofmat, 11),
+  ].join('');
+
+  const frows = (findings || '').split('\n').filter(r => r.trim()).map((row, i) => {
+    const pts = row.split('|');
+    const bg = i%2===0 ? '#fff' : '#FAFAFA';
+    return '<tr style="background:' + bg + '"><td style="padding:8px 12px;border:1px solid #EBEBEB;font-size:13px;vertical-align:top;width:140px;font-weight:600;color:#111">' + (pts[0]||'').trim() + '</td><td style="padding:8px 12px;border:1px solid #EBEBEB;font-size:13px;vertical-align:top;color:#333">' + (pts[1]||'').trim() + '</td><td style="padding:8px 12px;border:1px solid #EBEBEB;font-size:12px;text-align:center;width:60px;color:#999">' + (pts[2]||'').trim() + '</td></tr>';
+  }).join('');
+
+  const rrows = (recs || '').split('\n').filter(r => r.trim()).map((row, i) => {
+    const ci = row.indexOf(':');
+    const pri = ci >= 0 ? row.substring(0, ci).trim() : 'Action';
+    const act = ci >= 0 ? row.substring(ci+1).trim() : row;
+    const col = pri === 'Immediate' ? '#DC2626' : pri === 'Short Term' ? '#D97706' : '#16A34A';
+    const bg = i%2===0 ? '#fff' : '#FAFAFA';
+    return '<tr style="background:' + bg + '"><td style="padding:8px 12px;border:1px solid #EBEBEB;font-size:13px;font-weight:700;color:' + col + ';width:110px">' + pri + '</td><td style="padding:8px 12px;border:1px solid #EBEBEB;font-size:13px;color:#333">' + act + '</td></tr>';
+  }).join('');
+
+  const phtml = photos.map((p, i) =>
+    '<div style="display:inline-block;margin:6px;width:215px;vertical-align:top"><img src="' + p.url + '" style="width:215px;height:150px;object-fit:cover;border:1px solid #EBEBEB;border-radius:6px;display:block"><div style="font-size:11px;color:#999;padding:5px 2px">' + (i+1) + (p.cap ? ' — ' + p.cap : '') + '</div></div>'
+  ).join('');
+
+  const coverLines = [
+    f.client ? 'Prepared for ' + f.client + (f.ref ? ' &nbsp;·&nbsp; ' + f.ref : '') : '',
+    f.insurer ? 'On behalf of ' + f.insurer + (f.insurerref ? ' (Ref: ' + f.insurerref + ')' : '') : '',
+    f.customer ? f.customer + (f.address ? ' &nbsp;·&nbsp; ' + f.address : '') : (f.address || ''),
+  ].filter(Boolean).join('<br>');
+
+  const entryH = type === 'leak' && entry && entry !== 'N/A' ? '<div class="sh">Point of Water Entry</div><div class="bx">' + entry + '</div>' : '';
+  const maintH = maint ? '<div class="sh">Maintenance</div><div class="bx">' + maint + '</div>' : '';
+  const photH = photos.length ? '<div class="sh">Site Photographs</div><div style="margin-top:10px">' + phtml + '</div>' : '';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;color:#111;background:#fff}
+.cv{background:#111;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden;page-break-after:always}
+.cv::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:#fff;opacity:0.1}
+.pg{padding:16mm 20mm}
+.sh{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;margin:18px 0 0;padding-bottom:8px;border-bottom:1px solid #EBEBEB}
+.bx{background:#FAFAFA;padding:12px 14px;font-size:13px;line-height:1.7;color:#333;border:1px solid #EBEBEB;border-radius:0 0 4px 4px;white-space:pre-wrap}
+table{width:100%;border-collapse:collapse;margin:0 0 4px}
+th{background:#111;color:#fff;padding:8px 12px;font-size:11px;font-weight:600;text-align:left;letter-spacing:0.3px;text-transform:uppercase}
+.pb{position:fixed;top:16px;right:16px;background:#111;border:none;padding:10px 20px;color:#fff;font-weight:600;font-size:14px;cursor:pointer;border-radius:6px;z-index:999;font-family:inherit}
+@media print{.pb{display:none}@page{margin:15mm}}
+</style></head><body>
+<button class="pb" onclick="window.print()">Print / Save PDF</button>
+<div class="cv">
+  <div style="position:relative;z-index:1;padding:20mm;max-width:500px">
+    <div style="font-size:11px;font-weight:600;color:#555;letter-spacing:2px;text-transform:uppercase;margin-bottom:28px">TRADE REPORTA</div>
+    <div style="width:32px;height:1px;background:#555;margin:0 auto 28px"></div>
+    <div style="color:#fff;font-size:26px;font-weight:700;margin-bottom:10px;line-height:1.2;letter-spacing:-0.5px">${title}</div>
+    <div style="color:#666;font-size:13px;margin-bottom:32px">${sub}</div>
+    <div style="color:#555;font-size:13px;line-height:2.2">${coverLines}</div>
+  </div>
+  <div style="position:absolute;bottom:14mm;color:#444;font-size:10px;text-align:center;width:100%">JFR Roofing Pty Ltd &nbsp;|&nbsp; ABN: 46 660 637 614 &nbsp;|&nbsp; jack@jfrroofing.com &nbsp;|&nbsp; 0458 217 645 &nbsp;|&nbsp; NSW Licence: 381433C</div>
+</div>
+<div class="pg">
+  <div class="sh">Job Details</div>
+  <table><tbody>${kvs}</tbody></table>
+  <div class="sh">Scope of Works</div>
+  <div class="bx">${scope || 'JFR Roofing attended site to carry out a comprehensive inspection.'}</div>
+  <div class="sh">Findings</div>
+  <table><thead><tr><th style="width:140px">Area / Component</th><th>Observation</th><th style="width:60px;text-align:center">Photos</th></tr></thead><tbody>${frows}</tbody></table>
+  ${entryH}
+  <div class="sh">Causation</div>
+  <div class="bx">${causation || ''}</div>
+  ${maintH}
+  <div class="sh">Recommendations</div>
+  <table><thead><tr><th style="width:110px">Priority</th><th>Action</th></tr></thead><tbody>${rrows}</tbody></table>
+  <div class="sh">Conclusion</div>
+  <div class="bx">${conclusion || ''}</div>
+  ${photH}
+  <div class="sh">Sign Off</div>
+  <table><tbody>
+    <tr style="background:#fff"><td style="padding:10px 12px;border:1px solid #EBEBEB;font-size:11px;font-weight:600;color:#999;width:130px;text-transform:uppercase;letter-spacing:0.3px">Prepared By</td><td style="padding:10px 12px;border:1px solid #EBEBEB;font-size:13px">JFR Roofing Pty Ltd</td></tr>
+    <tr style="background:#FAFAFA"><td style="padding:10px 12px;border:1px solid #EBEBEB;font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:0.3px">Inspector</td><td style="padding:14px 12px;border:1px solid #EBEBEB;font-size:13px">${f.inspector || '________________________________'}</td></tr>
+    <tr style="background:#fff"><td style="padding:10px 12px;border:1px solid #EBEBEB;font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:0.3px">Signature</td><td style="padding:22px 12px;border:1px solid #EBEBEB"></td></tr>
+    <tr style="background:#FAFAFA"><td style="padding:10px 12px;border:1px solid #EBEBEB;font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:0.3px">Date</td><td style="padding:14px 12px;border:1px solid #EBEBEB;font-size:13px">${f.date || '________________________________'}</td></tr>
+  </tbody></table>
+  <div style="border-top:1px solid #EBEBEB;margin-top:20px;padding-top:10px;font-size:10px;color:#CCC;line-height:1.6">DISCLAIMER: This report is based on visible site conditions at the time of inspection only. Hidden defects and areas not accessible have not been assessed. Prepared for the exclusive use of the named client. Must not be relied upon by any third party without written consent of JFR Roofing Pty Ltd.</div>
+</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+  else showToast('Please allow pop-ups to view the report');
+}
+</script>
+</body>
+</html>
