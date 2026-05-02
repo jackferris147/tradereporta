@@ -553,7 +553,7 @@ async function parseWO() {
   try {
     const res = await fetch(API, { method: 'POST', headers: hdrs(), body: JSON.stringify({
       model: 'claude-sonnet-4-5', max_tokens: 800,
-      messages: [{ role: 'user', content: 'Extract job details from this work order. Return ONLY JSON (no markdown):\n{"client":"","ref":"","cm":"","cmemail":"","insurer":"","insurerref":"","customer":"","custphone":"","address":"","type":"roof or leak","roofmat":""}\n\nWork order:\n' + text }]
+      messages: [{ role: 'user', content: Extract job details from this work order. IMPORTANT: The CLIENT is the company that issued and sent this PO to JFR Roofing - look at whose email domain appears and who wrote the work order (e.g. ARC Projects, a strata manager) NOT the insurance company. The INSURER is the insurance company (e.g. AAI Limited). Return ONLY JSON no markdown:\n{"client":"issuing company","ref":"PO number","cm":"case manager name","cmemail":"case manager email","insurer":"insurance company","insurerref":"insurance ref","customer":"property owner","custphone":"phone","address":"site address","type":"roof or leak","roofmat":"roof material"}\n\nWork order:\n
     })});
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
