@@ -796,7 +796,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
 /* ---- SAVE BUTTON ---- */
 '<div class="savebtn"><button onclick="window.print()">Save as PDF</button><p id="print-tip"></p></div>' +
-'<scr'+'ipt>var t=document.getElementById("print-tip");var isSafari=/^((?!chrome|android).)*safari/i.test(navigator.userAgent);t.innerHTML=isSafari?"Safari: click <strong>Show Details</strong> &rarr; uncheck <strong>Print headers and footers</strong>":"Chrome: uncheck <strong>Headers and footers</strong> &nbsp;&middot;&nbsp; set Margins to <strong>None</strong> &nbsp;&middot;&nbsp; save as PDF";<\/script>' +
+'<scr'+'ipt>var t=document.getElementById("print-tip");var isSafari=/^((?!chrome|android).)*safari/i.test(navigator.userAgent);t.innerHTML=isSafari?"For a clean PDF without URL &amp; page numbers, open this page in <strong>Chrome</strong> and use Save as PDF there":"Uncheck <strong>Headers and footers</strong> &nbsp;&middot;&nbsp; set Margins to <strong>None</strong> &nbsp;&middot;&nbsp; Destination: <strong>Save as PDF</strong>";<\/script>' +
 
 /* ---- COVER PAGE ---- */
 '<div class="cover">' +
