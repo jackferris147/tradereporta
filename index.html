@@ -758,10 +758,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '*{box-sizing:border-box;margin:0;padding:0}' +
 'html,body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
 '@page{size:A4 portrait;margin:0}' +
-'@media print{html{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important;padding:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.savebtn{display:none!important}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
+'@media print{html{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important;padding:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.savebtn{display:none!important}.cover{page-break-after:always;break-after:page}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
 
 /* ---- COVER ---- */
-'.cover{position:relative;width:210mm;height:297mm;overflow:hidden;page-break-after:always;break-after:page;background:#2e2e2e;margin:0;padding:0}' +
+'.cover{position:relative;width:210mm;height:297mm;overflow:hidden;background:#2e2e2e;margin:0;padding:0}' +
 '.ctop-stripe{position:absolute;top:0;left:0;right:0;height:14px;background:#C8D400}' +
 '.cbot-stripe{position:absolute;bottom:0;left:0;right:0;height:14px;background:#C8D400}' +
 '.cmid{position:absolute;top:14px;left:0;right:0;bottom:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 40px}' +
@@ -816,7 +816,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '</div>' +
 
 /* ---- CONTENT PAGE ---- */
-'<div class="page pgbreak">' +
+'<div class="page">' +
   '<div class="phdr">' +
     '<img src="'+LOGO+'" class="phdr-logo">' +
     '<div class="phdr-r"><div class="phdr-title">'+title+'</div><div class="phdr-ref">Ref: '+esc(f.ref||'')+'</div></div>' +
@@ -869,6 +869,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '</div>' +
 '<scr'+'ipt>' +
 'var PDF_FILENAME="'+((f.address||title).replace(/[<>"\/\\|?*:]/g,'').trim())+'.pdf";' +
+'var REPORT_TITLE="'+(title.replace(/\\/g,'\\\\').replace(/"/g,'\\"'))+'";' +
 'function savePDF(){' +
 'window.scrollTo(0,0);' +
 'var btn=document.getElementById("pdf-btn");' +
@@ -877,8 +878,19 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 'html2pdf().set({margin:0,filename:PDF_FILENAME,image:{type:"jpeg",quality:0.98},' +
 'html2canvas:{scale:2,useCORS:true,logging:false,windowWidth:794,scrollX:0,scrollY:0,x:0,y:0},' +
 'pagebreak:{mode:["css"]},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}})' +
-'.from(document.getElementById("report")).output("blob")' +
-'.then(function(blob){' +
+'.from(document.getElementById("report"))' +
+'.toPdf().get("pdf").then(function(pdf){' +
+'var n=pdf.internal.getNumberOfPages();' +
+'for(var i=2;i<=n;i++){' +
+'pdf.setPage(i);' +
+'pdf.setFillColor(46,46,46);pdf.rect(0,0,210,13,"F");' +
+'pdf.setFillColor(200,212,0);pdf.rect(0,13,210,1.2,"F");' +
+'pdf.setTextColor(200,212,0);pdf.setFontSize(8);pdf.setFont("helvetica","bold");' +
+'pdf.text(REPORT_TITLE,200,8.5,{align:"right"});' +
+'pdf.setTextColor(180,180,180);pdf.setFontSize(7);pdf.setFont("helvetica","normal");' +
+'pdf.text("JFR ROOFING",10,8.5);' +
+'}' +
+'var blob=pdf.output("blob");' +
 'btn.textContent="\\u2193 Download PDF";btn.disabled=false;' +
 'var url=URL.createObjectURL(blob);' +
 'if(isIOS){window.location.href=url;}' +
