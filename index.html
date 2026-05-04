@@ -753,6 +753,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
   var html = '<!DOCTYPE html><html><head>' +
 '<meta charset="UTF-8"><title>'+title+'</title>' +
+'<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/scr'+'ipt>' +
 '<style>' +
 '*{box-sizing:border-box;margin:0;padding:0}' +
 'html,body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
@@ -795,10 +796,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '</style></head><body>' +
 
 /* ---- SAVE BUTTON ---- */
-'<div class="savebtn"><button onclick="window.print()">Save as PDF</button><p id="print-tip"></p></div>' +
-'<scr'+'ipt>var t=document.getElementById("print-tip");var isSafari=/^((?!chrome|android).)*safari/i.test(navigator.userAgent);t.innerHTML=isSafari?"For a clean PDF without URL &amp; page numbers, open this page in <strong>Chrome</strong> and use Save as PDF there":"Uncheck <strong>Headers and footers</strong> &nbsp;&middot;&nbsp; set Margins to <strong>None</strong> &nbsp;&middot;&nbsp; Destination: <strong>Save as PDF</strong>";<\/script>' +
+'<div class="savebtn"><button id="pdf-btn" onclick="savePDF()">&#8595; Download PDF</button><p>Saves directly to your device &mdash; no print dialog needed</p></div>' +
 
-/* ---- COVER PAGE ---- */
+/* ---- REPORT CONTENT ---- */
+'<div id="report">' +
 '<div class="cover">' +
   '<div class="ctop-stripe"></div>' +
   '<div class="cbot-stripe"></div>' +
@@ -864,7 +865,25 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
   '<div style="margin-top:12px;font-size:8px;color:#aaa;font-style:italic;line-height:1.6">DISCLAIMER: This report is based on visible site conditions at the time of inspection only. Hidden defects and areas not accessible have not been assessed. Prepared for the exclusive use of the named client.</div>' +
   '<div class="pfooter"><span>JFR Roofing Pty Ltd &nbsp;|&nbsp; ABN: 46 660 637 614 &nbsp;|&nbsp; jack@jfrroofing.com &nbsp;|&nbsp; 0458 217 645</span><span>NSW Contractor Licence: 381433C</span></div>' +
   '</div>' +
-'</div></body></html>';
+'</div>' +
+'</div>' +
+'<scr'+'ipt>' +
+'function savePDF(){' +
+'var btn=document.getElementById("pdf-btn");' +
+'btn.textContent="Generating...";btn.disabled=true;' +
+'html2pdf().set({' +
+'margin:0,' +
+'filename:"'+((f.address||title).replace(/[<>"\/\\|?*:]/g,'').trim())+'.pdf",' +
+'image:{type:"jpeg",quality:0.98},' +
+'html2canvas:{scale:2,useCORS:true,logging:false,windowWidth:794},' +
+'pagebreak:{mode:["css","legacy"]},' +
+'jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}' +
+'}).from(document.getElementById("report")).save()' +
+'.then(function(){btn.textContent="\\u2193 Download PDF";btn.disabled=false;})' +
+'.catch(function(){btn.textContent="\\u2193 Download PDF";btn.disabled=false;alert("PDF generation failed - try again");});' +
+'}' +
+'<\/scr'+'ipt>' +
+'</body></html>';
 
   // Open report in new tab - user taps Save as PDF button in the report
   var blob = new Blob([html], {type:'text/html;charset=utf-8'});
