@@ -756,7 +756,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '<style>' +
 '*{box-sizing:border-box;margin:0;padding:0}' +
 'html,body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-'@media print{@page{size:A4 portrait;margin:0}html{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.savebtn{display:none!important}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
+'@media print{@page{size:A4 portrait;margin:0!important;margin-top:0!important;margin-bottom:0!important}html{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important;padding:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.savebtn{display:none!important}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
 
 /* ---- COVER ---- */
 '.cover{position:relative;width:210mm;height:297mm;overflow:hidden;page-break-after:always;break-after:page;background:#2e2e2e;margin:0;padding:0}' +
@@ -779,7 +779,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.phdr-r{text-align:right}' +
 '.phdr-title{font-size:10px;font-weight:700;color:#C8D400;letter-spacing:0.5px;text-transform:uppercase}' +
 '.phdr-ref{font-size:8px;color:#aaa;text-decoration:underline}' +
-'.pcontent{padding:14px 16px}' +
+'.pcontent{padding:10mm 12mm}' +
 '.sh{background:#C8D400;color:#1a1a1a;font-size:10px;font-weight:700;letter-spacing:0.8px;padding:6px 12px;margin:14px 0 0;text-transform:uppercase}' +
 '.bx{background:#fff;border:none;padding:10px 12px;font-size:11px;line-height:1.7;color:#333;white-space:pre-wrap}' +
 'table{width:100%;border-collapse:collapse}' +
@@ -791,7 +791,6 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.savebtn button{background:#1a1a1a;color:#C8D400;border:none;padding:11px 0;font-size:15px;font-weight:700;border-radius:6px;cursor:pointer;width:100%;max-width:360px;font-family:inherit}' +
 '.savebtn p{color:#1a1a1a;font-size:10px;margin-top:4px}' +
 '.secwrap{break-inside:avoid;page-break-inside:avoid}' +
-'@media print{body{margin:0;padding:0}}' +
 '</style></head><body>' +
 
 /* ---- SAVE BUTTON ---- */
@@ -824,15 +823,15 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
   '<div class="secwrap"><div class="sh">Job Details</div>' +
   '<table><tbody>'+kvRows+'</tbody></table></div>' +
 
-  '<div class="secwrap"><div class="sh">Scope of Works</div>' +
-  '<div class="bx">'+esc(scope||'As requested, JFR Roofing attended site to carry out a comprehensive inspection.')+'</div></div>' +
+  '<div class="sh">Scope of Works</div>' +
+  '<div class="bx">'+esc(scope||'As requested, JFR Roofing attended site to carry out a comprehensive inspection.')+'</div>' +
 
-  '<div class="secwrap"><div class="sh">Findings</div>' +
+  '<div class="sh">Findings</div>' +
   '<table><thead><tr>' +
     '<th class="th" style="width:130px">Area</th>' +
     '<th class="th">Observation</th>' +
     '<th class="th" style="width:50px;text-align:center">Photos</th>' +
-  '</tr></thead><tbody>'+findRows+'</tbody></table></div>' +
+  '</tr></thead><tbody>'+findRows+'</tbody></table>' +
 
   entryH +
 
