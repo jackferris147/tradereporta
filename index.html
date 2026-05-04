@@ -781,8 +781,8 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.phdr-r{text-align:right}' +
 '.phdr-title{font-size:10px;font-weight:700;color:#C8D400;letter-spacing:0.5px;text-transform:uppercase}' +
 '.phdr-ref{font-size:8px;color:#aaa;text-decoration:underline}' +
-'.pcontent{padding:0 12mm 10mm}' +
-'.sh{background:#C8D400;color:#1a1a1a;font-size:10px;font-weight:700;letter-spacing:0.8px;padding:6px 12px;margin:0;text-transform:uppercase}' +
+'.pcontent{padding:10mm 12mm}' +
+'.sh{background:#C8D400;color:#1a1a1a;font-size:10px;font-weight:700;letter-spacing:0.8px;padding:6px 12px;margin:14px 0 0;text-transform:uppercase}' +
 '.bx{background:#fff;border:none;padding:10px 12px;font-size:11px;line-height:1.7;color:#333;white-space:pre-wrap}' +
 'table{width:100%;border-collapse:collapse}' +
 'td{padding:7px 12px;border-bottom:1px solid #e8e8e8;font-size:11px;vertical-align:top}' +
@@ -792,7 +792,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.savebtn{position:fixed;bottom:0;left:0;right:0;background:#C8D400;padding:12px 16px;text-align:center;z-index:999}' +
 '.savebtn button{background:#1a1a1a;color:#C8D400;border:none;padding:11px 0;font-size:15px;font-weight:700;border-radius:6px;cursor:pointer;width:100%;max-width:360px;font-family:inherit}' +
 '.savebtn p{color:#1a1a1a;font-size:10px;margin-top:4px}' +
-'.secwrap{break-inside:avoid;page-break-inside:avoid;margin-top:13mm}' +
+'.secwrap{break-inside:avoid;page-break-inside:avoid}' +
 '</style></head><body>' +
 
 /* ---- SAVE BUTTON ---- */
@@ -869,35 +869,23 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '</div>' +
 '<scr'+'ipt>' +
 'var PDF_FILENAME="'+((f.address||title).replace(/[<>"\/\\|?*:]/g,'').trim())+'.pdf";' +
-'function openBlob(blob){' +
-'var url=URL.createObjectURL(blob);' +
-'var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&"ontouchend" in document);' +
-'if(isIOS){window.location.href=url;}' +
-'else{var a=document.createElement("a");a.href=url;a.download=PDF_FILENAME;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},60000);}' +
-'}' +
 'function savePDF(){' +
 'window.scrollTo(0,0);' +
 'var btn=document.getElementById("pdf-btn");' +
 'btn.textContent="Generating...";btn.disabled=true;' +
-'var phdr=document.querySelector(".phdr");' +
-'html2canvas(phdr,{scale:2,useCORS:true,logging:false,windowWidth:794,scrollX:0,scrollY:0})' +
-'.then(function(hc){' +
-'var hdrImg=hc.toDataURL("image/jpeg",0.99);' +
-'var hdrMm=(hc.height/2)/3.7795;' +
-'phdr.style.visibility="hidden";' +
-'return html2pdf().set({margin:0,filename:PDF_FILENAME,image:{type:"jpeg",quality:0.98},' +
+'var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&"ontouchend" in document);' +
+'html2pdf().set({margin:0,filename:PDF_FILENAME,image:{type:"jpeg",quality:0.98},' +
 'html2canvas:{scale:2,useCORS:true,logging:false,windowWidth:794,scrollX:0,scrollY:0,x:0,y:0},' +
 'pagebreak:{mode:["css"]},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}})' +
-'.from(document.getElementById("report")).toPdf().get("pdf")' +
-'.then(function(pdf){' +
-'phdr.style.visibility="";' +
-'var n=pdf.internal.getNumberOfPages();' +
-'for(var p=2;p<=n;p++){pdf.setPage(p);pdf.addImage(hdrImg,"JPEG",0,0,210,hdrMm);}' +
-'return pdf.output("blob");' +
+'.from(document.getElementById("report")).output("blob")' +
+'.then(function(blob){' +
+'btn.textContent="\\u2193 Download PDF";btn.disabled=false;' +
+'var url=URL.createObjectURL(blob);' +
+'if(isIOS){window.location.href=url;}' +
+'else{var a=document.createElement("a");a.href=url;a.download=PDF_FILENAME;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},60000);}' +
+'}).catch(function(){' +
+'btn.textContent="\\u2193 Download PDF";btn.disabled=false;alert("PDF generation failed - try again");' +
 '});' +
-'})' +
-'.then(function(blob){btn.textContent="\\u2193 Download PDF";btn.disabled=false;openBlob(blob);})' +
-'.catch(function(){phdr.style.visibility="";btn.textContent="\\u2193 Download PDF";btn.disabled=false;alert("PDF generation failed - try again");});' +
 '}' +
 '<\/scr'+'ipt>' +
 '</body></html>';
