@@ -761,7 +761,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '@media print{html{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important;padding:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.savebtn{display:none!important}.cover{page-break-after:always;break-after:page}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
 
 /* ---- COVER ---- */
-'.cover{position:relative;width:210mm;height:297mm;overflow:hidden;background:#2e2e2e;margin:0;padding:0}' +
+'.cover{position:relative;width:210mm;height:284mm;overflow:hidden;background:#2e2e2e;margin:0;padding:0}' +
 '.ctop-stripe{position:absolute;top:0;left:0;right:0;height:14px;background:#C8D400}' +
 '.cbot-stripe{position:absolute;bottom:0;left:0;right:0;height:14px;background:#C8D400}' +
 '.cmid{position:absolute;top:14px;left:0;right:0;bottom:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 40px}' +
@@ -781,7 +781,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.phdr-r{text-align:right}' +
 '.phdr-title{font-size:10px;font-weight:700;color:#C8D400;letter-spacing:0.5px;text-transform:uppercase}' +
 '.phdr-ref{font-size:8px;color:#aaa;text-decoration:underline}' +
-'.pcontent{padding:10mm 12mm}' +
+'.pcontent{padding:4mm 12mm 10mm}' +
 '.sh{background:#C8D400;color:#1a1a1a;font-size:10px;font-weight:700;letter-spacing:0.8px;padding:6px 12px;margin:14px 0 0;text-transform:uppercase}' +
 '.bx{background:#fff;border:none;padding:10px 12px;font-size:11px;line-height:1.7;color:#333;white-space:pre-wrap}' +
 'table{width:100%;border-collapse:collapse}' +
@@ -817,10 +817,6 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
 /* ---- CONTENT PAGE ---- */
 '<div class="page">' +
-  '<div class="phdr">' +
-    '<img src="'+LOGO+'" class="phdr-logo">' +
-    '<div class="phdr-r"><div class="phdr-title">'+title+'</div><div class="phdr-ref">Ref: '+esc(f.ref||'')+'</div></div>' +
-  '</div>' +
   '<div class="pcontent">' +
 
   '<div class="secwrap"><div class="sh">Job Details</div>' +
@@ -870,31 +866,49 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '<scr'+'ipt>' +
 'var PDF_FILENAME="'+((f.address||title).replace(/[<>"\/\\|?*:]/g,'').trim())+'.pdf";' +
 'var REPORT_TITLE="'+(title.replace(/\\/g,'\\\\').replace(/"/g,'\\"'))+'";' +
+'var REPORT_REF="'+(f.ref||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'";' +
+'var LOGO_DATA="'+LOGO+'";' +
 'function savePDF(){' +
 'window.scrollTo(0,0);' +
 'var btn=document.getElementById("pdf-btn");' +
 'btn.textContent="Generating...";btn.disabled=true;' +
 'var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&"ontouchend" in document);' +
-'html2pdf().set({margin:0,filename:PDF_FILENAME,image:{type:"jpeg",quality:0.98},' +
+'html2pdf().set({margin:[13,0,0,0],filename:PDF_FILENAME,image:{type:"jpeg",quality:0.98},' +
 'html2canvas:{scale:2,useCORS:true,logging:false,windowWidth:794,scrollX:0,scrollY:0,x:0,y:0},' +
 'pagebreak:{mode:["css"]},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}})' +
 '.from(document.getElementById("report"))' +
 '.toPdf().get("pdf").then(function(pdf){' +
 'var n=pdf.internal.getNumberOfPages();' +
+'function applyHeaders(wl,ar){' +
+'pdf.setPage(1);pdf.setFillColor(46,46,46);pdf.rect(0,0,210,13,"F");' +
 'for(var i=2;i<=n;i++){' +
 'pdf.setPage(i);' +
 'pdf.setFillColor(46,46,46);pdf.rect(0,0,210,13,"F");' +
 'pdf.setFillColor(200,212,0);pdf.rect(0,13,210,1.2,"F");' +
+'if(wl){var lh=9,lw=lh*(ar||1);pdf.addImage(wl,"PNG",5,2,lw,lh);}' +
 'pdf.setTextColor(200,212,0);pdf.setFontSize(8);pdf.setFont("helvetica","bold");' +
-'pdf.text(REPORT_TITLE,200,8.5,{align:"right"});' +
-'pdf.setTextColor(180,180,180);pdf.setFontSize(7);pdf.setFont("helvetica","normal");' +
-'pdf.text("JFR ROOFING",10,8.5);' +
+'pdf.text(REPORT_TITLE,205,7,{align:"right"});' +
+'if(REPORT_REF){pdf.setTextColor(160,160,160);pdf.setFontSize(6.5);pdf.setFont("helvetica","normal");pdf.text("Ref: "+REPORT_REF,205,11,{align:"right"});}' +
 '}' +
 'var blob=pdf.output("blob");' +
 'btn.textContent="\\u2193 Download PDF";btn.disabled=false;' +
 'var url=URL.createObjectURL(blob);' +
 'if(isIOS){window.location.href=url;}' +
 'else{var a=document.createElement("a");a.href=url;a.download=PDF_FILENAME;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},60000);}' +
+'}' +
+'var img=new Image();' +
+'img.onload=function(){' +
+'try{' +
+'var cv=document.createElement("canvas");cv.width=img.width;cv.height=img.height;' +
+'var cx=cv.getContext("2d");cx.drawImage(img,0,0);' +
+'var id=cx.getImageData(0,0,cv.width,cv.height),d=id.data;' +
+'for(var p=0;p<d.length;p+=4){if(d[p+3]>0){d[p]=255-d[p];d[p+1]=255-d[p+1];d[p+2]=255-d[p+2];}}' +
+'cx.putImageData(id,0,0);' +
+'applyHeaders(cv.toDataURL("image/png"),img.width/img.height);' +
+'}catch(e){applyHeaders(null,1);}' +
+'};' +
+'img.onerror=function(){applyHeaders(null,1);};' +
+'img.src=LOGO_DATA;' +
 '}).catch(function(){' +
 'btn.textContent="\\u2193 Download PDF";btn.disabled=false;alert("PDF generation failed - try again");' +
 '});' +
