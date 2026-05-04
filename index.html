@@ -775,7 +775,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.cfoot{color:#555;font-size:9px;line-height:1.9;text-align:center}' +
 
 /* ---- CONTENT PAGES ---- */
-'.page{padding:0;background:#fff}' +
+'.page{padding:0;background:#fff;width:210mm}' +
 '.phdr{background:#2e2e2e;display:flex;align-items:center;justify-content:space-between;padding:8px 14px 5px;border-bottom:4px solid #C8D400}' +
 '.phdr-logo{height:32px;filter:brightness(0) invert(1)}' +
 '.phdr-r{text-align:right}' +
@@ -799,7 +799,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '<div class="savebtn"><button id="pdf-btn" onclick="savePDF()">&#8595; Save as PDF</button><p id="pdf-tip">Tap to generate &mdash; then share or save to Files</p></div>' +
 
 /* ---- REPORT CONTENT ---- */
-'<div id="report">' +
+'<div id="report" style="width:210mm;margin:0;">' +
 '<div class="cover">' +
   '<div class="ctop-stripe"></div>' +
   '<div class="cbot-stripe"></div>' +
@@ -870,6 +870,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '<scr'+'ipt>' +
 'var PDF_FILENAME="'+((f.address||title).replace(/[<>"\/\\|?*:]/g,'').trim())+'.pdf";' +
 'function savePDF(){' +
+'window.scrollTo(0,0);' +
 'var btn=document.getElementById("pdf-btn");' +
 'btn.textContent="Generating...";btn.disabled=true;' +
 'var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&"ontouchend" in document);' +
@@ -877,7 +878,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 'margin:0,' +
 'filename:PDF_FILENAME,' +
 'image:{type:"jpeg",quality:0.98},' +
-'html2canvas:{scale:2,useCORS:true,logging:false,windowWidth:794},' +
+'html2canvas:{scale:2,useCORS:true,logging:false,windowWidth:794,scrollX:0,scrollY:0,x:0,y:0},' +
 'pagebreak:{mode:["css","legacy"]},' +
 'jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}' +
 '}).from(document.getElementById("report")).output("blob")' +
