@@ -713,12 +713,16 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
   var findLines = (findings||'').split('\n').filter(function(r){ return r.trim(); });
   var findRows = findLines.map(function(line,fi){
-    var pts = line.split('|');
+    var first = line.indexOf('|');
+    var last  = line.lastIndexOf('|');
+    var area     = (first>=0 ? line.substring(0,first) : line).trim();
+    var obs      = (first>=0 && last>first ? line.substring(first+1,last) : first>=0 ? line.substring(first+1) : '').trim();
+    var photoRef = (last>first ? line.substring(last+1) : '').trim();
     var bg = fi%2===0?'#fff':'#f5f5f5';
     return '<tr style="background:'+bg+'">'+
-      '<td style="font-weight:600">'+esc((pts[0]||'').trim())+'</td>'+
-      '<td>'+esc((pts[1]||'').trim())+'</td>'+
-      '<td style="text-align:center;font-size:10px">'+esc((pts[2]||'').trim())+'</td>'+
+      '<td style="font-weight:600">'+esc(area)+'</td>'+
+      '<td>'+esc(obs)+'</td>'+
+      '<td style="text-align:center;font-size:10px">'+esc(photoRef)+'</td>'+
     '</tr>';
   }).join('');
 
