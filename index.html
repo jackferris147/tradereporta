@@ -295,7 +295,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <div class="genbar" id="gen-bar" style="display:none">
   <div class="geninfo"><strong id="gen-name">New Report</strong><div id="gen-status"></div></div>
-  <button class="pbtn" id="gen-btn" onclick="generate()" style="font-size:14px;padding:11px 22px">Generate PDF</button>
+  <div style="display:flex;gap:10px">
+    <button class="sbtn" onclick="var el=document.getElementById('ai-scope');el.scrollIntoView({behavior:'smooth'});el.focus();" style="font-size:13px;padding:11px 18px">Review Sections</button>
+    <button class="pbtn" id="gen-btn" onclick="generate()" style="font-size:14px;padding:11px 22px">Generate PDF</button>
+  </div>
 </div>
 
 <script>
