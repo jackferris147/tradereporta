@@ -744,9 +744,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     }
     if(recCur) recCats[recCur]+=(recCats[recCur]?' ':'')+rl;
   }
+  var recColors={Immediate:'#cc0000',Maintenance:'#cc8800',Monitor:'#2e7d32'};
   var recRows=['Immediate','Maintenance','Monitor'].map(function(p){
     return '<tr>'+
-      '<td style="background:#2e2e2e;color:#fff;font-weight:700;width:90px">'+p+'</td>'+
+      '<td style="color:'+recColors[p]+';font-weight:700;width:90px">'+p+'</td>'+
       '<td>'+esc(recCats[p]||'—')+'</td>'+
     '</tr>';
   }).join('');
@@ -780,7 +781,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '*{box-sizing:border-box;margin:0;padding:0}' +
 'html,body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
 '@page{size:A4 portrait;margin:0}' +
-'@media print{html{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important;padding:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.savebtn{display:none!important}.cover{page-break-after:always;break-after:page}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
+'@media print{html{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important;padding:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.savebtn{display:none!important}.cover{page-break-after:always;break-after:page;overflow:hidden!important;height:297mm!important;max-height:297mm!important;margin-bottom:-1px!important}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
 
 /* ---- COVER ---- */
 '.cover{position:relative;width:210mm;height:297mm;overflow:hidden;page-break-after:always;break-after:page;background:#2e2e2e;margin:0;padding:0}' +
@@ -797,8 +798,9 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.cfoot{color:#555;font-size:9px;line-height:1.9;text-align:center}' +
 
 /* ---- CONTENT PAGES ---- */
-'.page{padding:8mm 10mm;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222}' +
-'.pcontent{margin-top:10px}' +
+'.page{width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222}' +
+'.page>thead>tr>td{padding:0;border:0}' +
+'.page>tbody>tr>td{padding:10mm;border:0;vertical-align:top}' +
 '.phdr{background:#2e2e2e;display:flex;align-items:center;justify-content:space-between;padding:8px 14px 5px;border-bottom:3px solid #C8D400;margin-bottom:12px}' +
 '.phdr-logo{height:36px;filter:brightness(0) invert(1)}' +
 '.phdr-r{text-align:right}' +
@@ -838,12 +840,14 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '</div>' +
 
 /* ---- CONTENT PAGE ---- */
-'<div class="page">' +
-  '<div class="phdr">' +
-    '<img src="'+LOGO+'" class="phdr-logo">' +
-    '<div class="phdr-r"><div class="phdr-title">'+title+'</div><div class="phdr-ref">Ref: '+esc(f.ref||'')+'</div></div>' +
-  '</div>' +
-  '<div class="pcontent">' +
+'<table class="page">' +
+  '<thead><tr><td>' +
+    '<div class="phdr">' +
+      '<img src="'+LOGO+'" class="phdr-logo">' +
+      '<div class="phdr-r"><div class="phdr-title">'+title+'</div><div class="phdr-ref">Ref: '+esc(f.ref||'')+'</div></div>' +
+    '</div>' +
+  '</td></tr></thead>' +
+  '<tbody><tr><td>' +
 
   '<div class="secwrap"><div class="sh">Job Details</div>' +
   '<table><tbody>'+kvRows+'</tbody></table></div>' +
@@ -886,8 +890,8 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
   '<div style="margin-top:12px;font-size:8px;color:#aaa;font-style:italic;line-height:1.6">DISCLAIMER: This report is based on visible site conditions at the time of inspection only. Hidden defects and areas not accessible have not been assessed. Prepared for the exclusive use of the named client.</div>' +
   '<div class="pfooter"><span>JFR Roofing Pty Ltd &nbsp;|&nbsp; ABN: 46 660 637 614 &nbsp;|&nbsp; jack@jfrroofing.com &nbsp;|&nbsp; 0458 217 645</span><span>NSW Contractor Licence: 381433C</span></div>' +
-  '</div>' +
-'</div>' +
+  '</td></tr></tbody>' +
+'</table>' +
 '</div>' +
 '<scr'+'ipt>' +
 'function savePDF(){window.print();}' +
