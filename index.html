@@ -720,12 +720,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     var last  = line.lastIndexOf('|');
     var area     = (first>=0 ? line.substring(0,first) : line).trim();
     var obs      = (first>=0 && last>first ? line.substring(first+1,last) : first>=0 ? line.substring(first+1) : '').trim();
-    var photoRef = (last>first ? line.substring(last+1) : '').trim();
     var bg = fi%2===0?'#fff':'#f5f5f5';
     return '<tr style="background:'+bg+'">'+
       '<td style="font-weight:600">'+esc(area)+'</td>'+
       '<td>'+esc(obs)+'</td>'+
-      '<td style="text-align:center;font-size:10px">'+esc(photoRef)+'</td>'+
     '</tr>';
   }).join('');
 
@@ -767,7 +765,19 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
   }
 
   var entryH = (isLeak&&entry&&entry!=='N/A')?'<div class="secwrap"><div class="sh">POINT OF WATER ENTRY</div><div class="bx">'+esc(entry)+'</div></div>':'';
-  var maintH = maint?'<div class="secwrap"><div class="sh">MAINTENANCE</div><div class="bx">'+esc(maint)+'</div></div>':'';
+  var maintHtml = '';
+  if(maint){
+    var maintLines = maint.split('\n');
+    maintHtml = maintLines.map(function(ml){
+      var t = ml.toLowerCase();
+      var col = '#222';
+      if(/immediate|urgent|safety|danger/.test(t)) col='#cc0000';
+      else if(/recommend|should|maintain|service/.test(t)) col='#cc8800';
+      else if(/monitor|watch|observe|check/.test(t)) col='#2e7d32';
+      return ml.trim()?'<span style="color:'+col+';display:block">'+esc(ml)+'</span>':ml;
+    }).join('');
+  }
+  var maintH = maint?'<div class="secwrap"><div class="sh">MAINTENANCE</div><div class="bx" style="white-space:normal">'+maintHtml+'</div></div>':'';
   var photoH = photos.length?'<div class="secwrap"><div class="sh">SITE PHOTOGRAPHS</div><table style="width:100%;border-collapse:collapse;margin-top:6px"><tbody>'+photoRows+'</tbody></table></div>':'';
 
   var coverInfo = '';
@@ -857,9 +867,8 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
   '<div class="sh">Findings</div>' +
   '<table><thead><tr>' +
-    '<th class="th" style="width:130px">Area</th>' +
+    '<th class="th" style="width:130px">Area / Component</th>' +
     '<th class="th">Observation</th>' +
-    '<th class="th" style="width:50px;text-align:center">Photos</th>' +
   '</tr></thead><tbody>'+findRows+'</tbody></table>' +
 
   entryH +
