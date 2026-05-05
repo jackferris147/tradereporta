@@ -715,17 +715,33 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
   var findRows = findLines.map(function(line,fi){
     var pts = line.split('|');
     var bg = fi%2===0?'#fff':'#f5f5f5';
-    return '<tr style="background:'+bg+';page-break-inside:avoid;break-inside:avoid"><td style="padding:6px 12px;border:1px solid #ddd;font-size:11px;vertical-align:top;width:140px;font-weight:600">'+esc((pts[0]||'').trim())+'</td><td style="padding:6px 12px;border:1px solid #ddd;font-size:11px;vertical-align:top;line-height:1.5">'+esc((pts[1]||'').trim())+'</td><td style="padding:6px 12px;border:1px solid #ddd;font-size:11px;text-align:center;vertical-align:top;width:55px;white-space:nowrap">'+esc((pts[2]||'').trim())+'</td></tr>';
+    return '<tr style="background:'+bg+'">'+
+      '<td style="font-weight:600">'+esc((pts[0]||'').trim())+'</td>'+
+      '<td>'+esc((pts[1]||'').trim())+'</td>'+
+      '<td style="text-align:center;font-size:10px">'+esc((pts[2]||'').trim())+'</td>'+
+    '</tr>';
   }).join('');
 
-  var recLines = (recs||'').split('\n').filter(function(r){ return r.trim(); });
-  var recRows = recLines.map(function(line,ri){
-    var ci = line.indexOf(':');
-    var pri = ci>=0?line.substring(0,ci).trim().replace(/\*\*/g,''):'Action';
-    var act = ci>=0?line.substring(ci+1).trim():line;
-    var col = pri==='Immediate'?'#C85000':pri==='Maintenance'?'#7A6500':'#2D6A2D';
-    var bg = ri%2===0?'#fff':'#f5f5f5';
-    return '<tr style="background:'+bg+'"><td style="padding:6px 12px;border:1px solid #ddd;font-size:11px;font-weight:700;color:'+col+';width:100px">'+esc(pri)+'</td><td style="padding:6px 12px;border:1px solid #ddd;font-size:11px;line-height:1.5">'+esc(act)+'</td></tr>';
+  var recCats={Immediate:'',Maintenance:'',Monitor:''};
+  var recCur=null;
+  var recParts=(recs||'').split('\n');
+  for(var ri=0;ri<recParts.length;ri++){
+    var rl=recParts[ri].trim().replace(/\*\*/g,'').replace(/^[-•]\s*/,'');
+    if(!rl) continue;
+    var rci=rl.indexOf(':');
+    if(rci>0){
+      var rp=rl.substring(0,rci).trim();
+      if(rp==='Immediate'||rp==='Maintenance'||rp==='Monitor'){
+        recCur=rp; recCats[rp]=rl.substring(rci+1).trim(); continue;
+      }
+    }
+    if(recCur) recCats[recCur]+=(recCats[recCur]?' ':'')+rl;
+  }
+  var recRows=['Immediate','Maintenance','Monitor'].map(function(p){
+    return '<tr>'+
+      '<td style="background:#2e2e2e;color:#fff;font-weight:700;width:90px">'+p+'</td>'+
+      '<td>'+esc(recCats[p]||'—')+'</td>'+
+    '</tr>';
   }).join('');
 
   var photoRows = '';
@@ -775,11 +791,11 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
 /* ---- CONTENT PAGES ---- */
 '.page{padding:0;background:#fff;width:210mm}' +
-'.phdr{background:#2e2e2e;display:flex;align-items:center;justify-content:space-between;padding:8px 14px 5px;border-bottom:4px solid #C8D400}' +
-'.phdr-logo{height:32px;filter:brightness(0) invert(1)}' +
+'.phdr{background:#2e2e2e;display:flex;align-items:center;justify-content:space-between;padding:8px 14px 5px;border-bottom:3px solid #C8D400}' +
+'.phdr-logo{height:36px;filter:brightness(0) invert(1)}' +
 '.phdr-r{text-align:right}' +
-'.phdr-title{font-size:10px;font-weight:700;color:#C8D400;letter-spacing:0.5px;text-transform:uppercase}' +
-'.phdr-ref{font-size:8px;color:#aaa;text-decoration:underline}' +
+'.phdr-title{font-size:10px;font-weight:700;color:#fff;letter-spacing:0.5px;text-transform:uppercase}' +
+'.phdr-ref{font-size:8px;color:#aaa}' +
 '.pcontent{padding:10mm 12mm}' +
 '.sh{background:#C8D400;color:#1a1a1a;font-size:10px;font-weight:700;letter-spacing:0.8px;padding:6px 12px;margin:14px 0 0;text-transform:uppercase}' +
 '.bx{background:#fff;border:none;padding:10px 12px;font-size:11px;line-height:1.7;color:#333;white-space:pre-wrap}' +
@@ -815,7 +831,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '</div>' +
 
 /* ---- CONTENT PAGE ---- */
-'<div class="page pgbreak">' +
+'<div class="page">' +
   '<div class="phdr">' +
     '<img src="'+LOGO+'" class="phdr-logo">' +
     '<div class="phdr-r"><div class="phdr-title">'+title+'</div><div class="phdr-ref">Ref: '+esc(f.ref||'')+'</div></div>' +
