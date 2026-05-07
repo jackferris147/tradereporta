@@ -310,6 +310,81 @@ var cid = null, jtype = 'roof', photos = [], busy = false;
 var mrec = null, achunks = [], rtimer = null, rsecs = 0;
 var API = 'https://api.anthropic.com/v1/messages';
 
+var idb = null;
+function openIDB(){
+  return new Promise(function(resolve){
+    try {
+      if(!window.indexedDB){ resolve(); return; }
+      var req = indexedDB.open('tr_db', 1);
+      req.onupgradeneeded = function(e){
+        var db = e.target.result;
+        if(!db.objectStoreNames.contains('photos')) db.createObjectStore('photos');
+      };
+      req.onsuccess = function(){ idb = req.result; resolve(); };
+      req.onerror = function(){ resolve(); };
+      req.onblocked = function(){ resolve(); };
+    } catch(e){ resolve(); }
+  });
+}
+function idbPut(id, arr){
+  return new Promise(function(resolve){
+    if(!idb||!id){ resolve(); return; }
+    try {
+      var tx = idb.transaction('photos','readwrite');
+      tx.objectStore('photos').put(arr, id);
+      tx.oncomplete = function(){ resolve(); };
+      tx.onerror = function(){ resolve(); };
+      tx.onabort = function(){ resolve(); };
+    } catch(e){ resolve(); }
+  });
+}
+function idbGet(id){
+  return new Promise(function(resolve){
+    if(!idb||!id){ resolve([]); return; }
+    try {
+      var tx = idb.transaction('photos','readonly');
+      var req = tx.objectStore('photos').get(id);
+      req.onsuccess = function(){ resolve(req.result||[]); };
+      req.onerror = function(){ resolve([]); };
+    } catch(e){ resolve([]); }
+  });
+}
+function idbDelete(id){
+  return new Promise(function(resolve){
+    if(!idb||!id){ resolve(); return; }
+    try {
+      var tx = idb.transaction('photos','readwrite');
+      tx.objectStore('photos').delete(id);
+      tx.oncomplete = function(){ resolve(); };
+      tx.onerror = function(){ resolve(); };
+    } catch(e){ resolve(); }
+  });
+}
+
+function compressImage(file){
+  return new Promise(function(resolve, reject){
+    var r = new FileReader();
+    r.onload = function(ev){
+      var img = new Image();
+      img.onload = function(){
+        var maxW = 1200;
+        var w = img.width, h = img.height;
+        if(w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        try {
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        } catch(e){ reject(e); }
+      };
+      img.onerror = function(){ reject(new Error('image decode failed')); };
+      img.src = ev.target.result;
+    };
+    r.onerror = function(){ reject(new Error('file read failed')); };
+    r.readAsDataURL(file);
+  });
+}
+
 function getKey(){ return localStorage.getItem('tr_key') || ''; }
 function hdrs(){
   var h = {};
@@ -339,6 +414,12 @@ window.addEventListener('load', function(){
     e.preventDefault(); dz.style.borderColor = '#DDD';
     readPhotosOrdered(Array.from(e.dataTransfer.files).filter(function(f){ return f.type.startsWith('image/'); }));
   });
+  openIDB().then(function(){
+    var openId = sessionStorage.getItem('tr_open_id');
+    if(openId && jobs.find(function(x){ return x.id===openId; })){
+      openJob(openId);
+    }
+  });
 });
 
 function goView(v){
@@ -346,7 +427,7 @@ function goView(v){
   document.getElementById('view-'+v).classList.add('on');
   document.getElementById('gen-bar').style.display = v==='form'?'flex':'none';
   ['jobs','settings'].forEach(function(n){ document.getElementById('nav-'+n).classList.toggle('on', n===v); });
-  if(v==='jobs') renderJobs();
+  if(v==='jobs'){ sessionStorage.removeItem('tr_open_id'); renderJobs(); }
   window.scrollTo(0,0);
 }
 
@@ -390,19 +471,21 @@ function saveKey(){
 
 function saveJobsStore(){
   try {
-    var full = jobs.map(function(j){
+    var textOnly = jobs.map(function(j){
       var c = {};
       for(var k in j){ if(j.hasOwnProperty(k) && k!=='photos') c[k] = j[k]; }
-      c.photos = (j.photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||''}; });
+      c.photoCount = (j.photos||[]).length;
       return c;
     });
-    localStorage.setItem('tr_jobs', JSON.stringify(full));
-  } catch(e){
-    try {
-      var slim = jobs.map(function(j){ var c = JSON.parse(JSON.stringify(j)); c.photos = (c.photos||[]).map(function(p){ return {cap:p.cap||'',url:''}; }); return c; });
-      localStorage.setItem('tr_jobs', JSON.stringify(slim));
-      showToast('Draft saved without photos - storage full');
-    } catch(e2){ console.log('Save failed:', e2.message); }
+    localStorage.setItem('tr_jobs', JSON.stringify(textOnly));
+  } catch(e){ console.log('localStorage save failed:', e.message); }
+  if(cid){
+    var i = jobs.findIndex(function(j){ return j.id===cid; });
+    if(i>=0){
+      var arr = (jobs[i].photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||''}; });
+      idbPut(cid, arr);
+    }
+    sessionStorage.setItem('tr_open_id', cid);
   }
 }
 
@@ -440,8 +523,8 @@ function deleteJob(id){
   if(!confirm('Delete this report? This cannot be undone.')) return;
   jobs = jobs.filter(function(j){ return j.id !== id; });
   saveJobsStore();
-  // If currently editing this job, go back to list
-  if(cid === id){ cid = null; goView('jobs'); }
+  idbDelete(id);
+  if(cid === id){ cid = null; sessionStorage.removeItem('tr_open_id'); goView('jobs'); }
   else { renderJobs(); }
   showToast('Report deleted');
 }
@@ -489,6 +572,7 @@ function clearForm(){
 function newJob(){
   cid = Date.now().toString(); jtype = 'roof';
   clearForm(); setType('roof');
+  sessionStorage.setItem('tr_open_id', cid);
   document.getElementById('form-title').textContent = 'New Report';
   document.getElementById('gen-name').textContent = 'New Report';
   goView('form');
@@ -498,7 +582,6 @@ function openJob(id){
   var j = jobs.find(function(x){ return x.id===id; }); if(!j) return;
   cid=id; jtype=j.type||'roof';
   clearForm();
-  photos = (j.photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||'', loading:false}; });
   setType(jtype);
   sv('f-client',j.client); sv('f-ref',j.ref); sv('f-cm',j.cm); sv('f-cmemail',j.cmemail);
   sv('f-insurer',j.insurer); sv('f-insurerref',j.insurerref); sv('f-customer',j.customer);
@@ -508,11 +591,24 @@ function openJob(id){
   sv('ai-scope',j.aiScope); sv('ai-findings',j.aiFindings); sv('ai-entry',j.aiEntry);
   sv('ai-causation',j.aiCausation); sv('ai-maint',j.aiMaint); sv('ai-recs',j.aiRecs); sv('ai-conclusion',j.aiConclusion);
   if(j.aiScope){ document.getElementById('sec-expanded').classList.add('on'); document.getElementById('sec-expanded').style.display='block'; }
+  photos = [];
   renderPhotos();
+  sessionStorage.setItem('tr_open_id', id);
   var addr = j.address||'Report';
   document.getElementById('form-title').textContent = addr;
   document.getElementById('gen-name').textContent = addr;
   goView('form');
+  var openCid = id;
+  idbGet(id).then(function(arr){
+    if(cid !== openCid) return;
+    var src = (arr && arr.length) ? arr : (j.photos||[]);
+    photos = src.map(function(p){ return {url:p.url||'', cap:p.cap||'', loading:false}; });
+    renderPhotos();
+    if((!arr || !arr.length) && j.photos && j.photos.length){
+      idbPut(id, photos.map(function(p){ return {url:p.url||'', cap:p.cap||''}; }));
+    }
+    j.photos = photos;
+  });
 }
 
 function parseWO(){
@@ -636,14 +732,14 @@ function readPhotosOrdered(files){
   for(var i=0;i<files.length;i++){ photos.push({url:'',cap:'',loading:true}); }
   renderPhotos();
   files.forEach(function(file, i){
-    var r = new FileReader();
-    r.onload = function(ev){
-      photos[startIdx+i].url = ev.target.result;
+    compressImage(file).then(function(dataUrl){
+      photos[startIdx+i].url = dataUrl;
       photos[startIdx+i].loading = false;
       renderPhotos();
-    };
-    r.onerror = function(){ photos[startIdx+i].loading = false; renderPhotos(); };
-    r.readAsDataURL(file);
+    }).catch(function(){
+      photos[startIdx+i].loading = false;
+      renderPhotos();
+    });
   });
 }
 
