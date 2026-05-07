@@ -297,9 +297,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="genbar" id="gen-bar" style="display:none">
   <div class="geninfo"><strong id="gen-name">New Report</strong><div id="gen-status"></div></div>
   <div style="display:flex;gap:10px">
-    <button class="sbtn" onclick="var el=document.getElementById('ai-scope');el.scrollIntoView({behavior:'smooth'});el.focus();" style="font-size:13px;padding:11px 18px">Review Sections</button>
-    <button class="savedraft" onclick="saveDraftBtn()" style="font-size:14px;padding:11px 18px">Save Draft</button>
-    <button class="pbtn" id="gen-btn" onclick="generate()" style="font-size:14px;padding:11px 22px">Generate PDF</button>
+    <button type="button" class="sbtn" onclick="var el=document.getElementById('ai-scope');el.scrollIntoView({behavior:'smooth'});el.focus();" style="font-size:13px;padding:11px 18px">Review Sections</button>
+    <button type="button" class="savedraft" onclick="saveDraftBtn()" style="font-size:14px;padding:11px 18px">Save Draft</button>
+    <button type="button" class="pbtn" id="gen-btn" onclick="generate()" style="font-size:14px;padding:11px 22px">Generate PDF</button>
   </div>
 </div>
 
@@ -433,7 +433,7 @@ function deleteJob(id){
   jobs = jobs.filter(function(j){ return j.id !== id; });
   saveJobsStore();
   // If currently editing this job, go back to list
-  if(cid === id){ cid = null; goView('home'); }
+  if(cid === id){ cid = null; goView('jobs'); }
   else { renderJobs(); }
   showToast('Report deleted');
 }
@@ -780,12 +780,13 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     '</tr>';
   }).join('');
 
+  var pdfPhotos = photos.filter(function(p){ return p && p.url; });
   var phRows = [];
-  for(var pi=0;pi<photos.length;pi+=3){
+  for(var pi=0;pi<pdfPhotos.length;pi+=3){
     var rowCls = 'ph-row'+(pi===0?' ph-first':'');
     var rowHtml = '<div class="'+rowCls+'">';
     for(var pj=0;pj<3;pj++){
-      var ph = photos[pi+pj];
+      var ph = pdfPhotos[pi+pj];
       if(ph){
         rowHtml += '<div class="ph-cell"><img src="'+ph.url+'"><div class="ph-cap">Photo '+(pi+pj+1)+(ph.cap?' - '+esc(ph.cap):'')+'</div></div>';
       } else {
@@ -796,7 +797,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     phRows.push(rowHtml);
   }
   var photoRows;
-  if(photos.length > 6){
+  if(pdfPhotos.length > 6){
     var phGrouped = [];
     for(var gi=0;gi<phRows.length;gi+=2){
       phGrouped.push('<div class="ph-group">'+phRows[gi]+(phRows[gi+1]||'')+'</div>');
@@ -820,7 +821,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     }).join('');
   }
   var maintH = maint?'<div class="secwrap"><div class="sh">MAINTENANCE</div><div class="bx" style="white-space:normal">'+maintHtml+'</div></div>':'';
-  var photoH = photos.length?'<div class="sh ph-head">SITE PHOTOGRAPHS</div><div style="margin-top:6px">'+photoRows+'</div>':'';
+  var photoH = pdfPhotos.length?'<div class="sh ph-head">SITE PHOTOGRAPHS</div><div style="margin-top:6px">'+photoRows+'</div>':'';
 
   var coverInfo = '';
   if(f.client) coverInfo += '<div>Prepared for: '+esc(f.client)+(f.ref?' &nbsp;|&nbsp; '+esc(f.ref):'')+'</div>';
