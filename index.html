@@ -46,6 +46,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .pbtn{background:#C8D400;border:none;border-radius:6px;color:#1a1a1a;font-weight:600;font-size:14px;padding:10px 18px;cursor:pointer;font-family:inherit}
 .pbtn:disabled{background:#DDD;color:#999;cursor:not-allowed}
 .sbtn{background:#fff;border:1px solid #E5E5E5;border-radius:6px;color:#444;font-size:13px;font-weight:500;padding:8px 14px;cursor:pointer;font-family:inherit}
+.savedraft{background:#2e2e2e;border:none;border-radius:6px;color:#fff;font-size:14px;font-weight:600;padding:10px 18px;cursor:pointer;font-family:inherit}
 .aibtn{background:#C8D400;border:none;border-radius:6px;color:#1a1a1a;font-size:13px;font-weight:600;padding:9px 16px;cursor:pointer;font-family:inherit;margin-top:10px;display:inline-block}
 .aibtn:disabled{background:#CCC;cursor:not-allowed}
 .pill{font-size:12px;font-weight:500;padding:8px 12px;border-radius:6px;margin-top:8px}
@@ -297,6 +298,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="geninfo"><strong id="gen-name">New Report</strong><div id="gen-status"></div></div>
   <div style="display:flex;gap:10px">
     <button class="sbtn" onclick="var el=document.getElementById('ai-scope');el.scrollIntoView({behavior:'smooth'});el.focus();" style="font-size:13px;padding:11px 18px">Review Sections</button>
+    <button class="savedraft" onclick="saveDraftBtn()" style="font-size:14px;padding:11px 18px">Save Draft</button>
     <button class="pbtn" id="gen-btn" onclick="generate()" style="font-size:14px;padding:11px 22px">Generate PDF</button>
   </div>
 </div>
@@ -335,7 +337,7 @@ window.addEventListener('load', function(){
   dz.addEventListener('dragleave', function(){ dz.style.borderColor = '#DDD'; });
   dz.addEventListener('drop', function(e){
     e.preventDefault(); dz.style.borderColor = '#DDD';
-    Array.from(e.dataTransfer.files).filter(function(f){ return f.type.startsWith('image/'); }).forEach(readPhoto);
+    readPhotosOrdered(Array.from(e.dataTransfer.files).filter(function(f){ return f.type.startsWith('image/'); }));
   });
 });
 
@@ -386,18 +388,25 @@ function saveKey(){
   showToast('API key saved');
 }
 
-function saveJobsStore(){ 
+function saveJobsStore(){
   try {
-    localStorage.setItem('tr_jobs', JSON.stringify(jobs)); 
+    var full = jobs.map(function(j){
+      var c = {};
+      for(var k in j){ if(j.hasOwnProperty(k) && k!=='photos') c[k] = j[k]; }
+      c.photos = (j.photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||''}; });
+      return c;
+    });
+    localStorage.setItem('tr_jobs', JSON.stringify(full));
   } catch(e){
-    // localStorage full (photos too large) - save without photo data
     try {
-      var slim = jobs.map(function(j){ var c = JSON.parse(JSON.stringify(j)); c.photos = (c.photos||[]).map(function(p){ return {cap:p.cap,url:''}; }); return c; });
+      var slim = jobs.map(function(j){ var c = JSON.parse(JSON.stringify(j)); c.photos = (c.photos||[]).map(function(p){ return {cap:p.cap||'',url:''}; }); return c; });
       localStorage.setItem('tr_jobs', JSON.stringify(slim));
-      showToast('Draft saved (photos too large to store - re-add after reopening)');
+      showToast('Draft saved without photos - storage full');
     } catch(e2){ console.log('Save failed:', e2.message); }
   }
 }
+
+function saveDraftBtn(){ saveJob(); showToast('Draft saved'); }
 
 function getJobData(){
   return {
@@ -479,8 +488,10 @@ function newJob(){
 
 function openJob(id){
   var j = jobs.find(function(x){ return x.id===id; }); if(!j) return;
-  cid=id; jtype=j.type||'roof'; photos=j.photos||[];
-  clearForm(); setType(jtype);
+  cid=id; jtype=j.type||'roof';
+  clearForm();
+  photos = (j.photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||''}; });
+  setType(jtype);
   sv('f-client',j.client); sv('f-ref',j.ref); sv('f-cm',j.cm); sv('f-cmemail',j.cmemail);
   sv('f-insurer',j.insurer); sv('f-insurerref',j.insurerref); sv('f-customer',j.customer);
   sv('f-custphone',j.custphone); sv('f-address',j.address); sv('f-date',j.date);
@@ -611,17 +622,29 @@ function doExpand(){
   .finally(function(){ busy=false; document.getElementById('gen-btn').disabled=false; });
 }
 
-function readPhoto(file){
-  var r = new FileReader();
-  r.onload = function(ev){ photos.push({url:ev.target.result,cap:''}); renderPhotos(); };
-  r.readAsDataURL(file);
+function readPhotosOrdered(files){
+  if(!files||!files.length) return;
+  var startIdx = photos.length;
+  for(var i=0;i<files.length;i++){ photos.push({url:'',cap:''}); }
+  renderPhotos();
+  files.forEach(function(file, i){
+    var r = new FileReader();
+    r.onload = function(ev){
+      photos[startIdx+i].url = ev.target.result;
+      renderPhotos();
+    };
+    r.readAsDataURL(file);
+  });
 }
 
-function addPhotos(e){ Array.from(e.target.files).forEach(readPhoto); e.target.value=''; }
+function addPhotos(e){ readPhotosOrdered(Array.from(e.target.files)); e.target.value=''; }
 
 function renderPhotos(){
   document.getElementById('photo-grid').innerHTML = photos.map(function(p,i){
-    return '<div class="ph"><img src="'+p.url+'" alt="Photo '+(i+1)+'"><span class="phnum">'+(i+1)+'</span><button class="phdel" onclick="removePhoto('+i+')">x</button><input class="phcap" value="'+p.cap+'" placeholder="Caption..." onchange="photos['+i+'].cap=this.value"></div>';
+    var imgHtml = p.url
+      ? '<img src="'+p.url+'" alt="Photo '+(i+1)+'">'
+      : '<div style="height:85px;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:11px;background:#f5f5f5">Loading...</div>';
+    return '<div class="ph">'+imgHtml+'<span class="phnum">'+(i+1)+'</span><button class="phdel" onclick="removePhoto('+i+')">x</button><input class="phcap" value="'+p.cap+'" placeholder="Caption..." onchange="photos['+i+'].cap=this.value"></div>';
   }).join('');
 }
 
@@ -750,18 +773,30 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     '</tr>';
   }).join('');
 
-  var photoRows = '';
+  var phRows = [];
   for(var pi=0;pi<photos.length;pi+=3){
-    photoRows += '<tr>';
+    var rowCls = 'ph-row'+(pi===0?' ph-first':'');
+    var rowHtml = '<div class="'+rowCls+'">';
     for(var pj=0;pj<3;pj++){
       var ph = photos[pi+pj];
       if(ph){
-        photoRows += '<td style="padding:5px;vertical-align:top;width:33.3%"><img src="'+ph.url+'" style="width:100%;height:120px;object-fit:cover;border:1px solid #ddd;display:block;border-radius:2px"><div style="font-size:9px;color:#888;font-style:italic;padding:3px 1px">Photo '+(pi+pj+1)+(ph.cap?' - '+ph.cap:'')+'</div></td>';
+        rowHtml += '<div class="ph-cell"><img src="'+ph.url+'"><div class="ph-cap">Photo '+(pi+pj+1)+(ph.cap?' - '+esc(ph.cap):'')+'</div></div>';
       } else {
-        photoRows += '<td style="width:33.3%"></td>';
+        rowHtml += '<div class="ph-cell"></div>';
       }
     }
-    photoRows += '</tr>';
+    rowHtml += '</div>';
+    phRows.push(rowHtml);
+  }
+  var photoRows;
+  if(photos.length > 6){
+    var phGrouped = [];
+    for(var gi=0;gi<phRows.length;gi+=2){
+      phGrouped.push('<div class="ph-group">'+phRows[gi]+(phRows[gi+1]||'')+'</div>');
+    }
+    photoRows = phGrouped.join('');
+  } else {
+    photoRows = phRows.join('');
   }
 
   var entryH = (isLeak&&entry&&entry!=='N/A')?'<div class="secwrap"><div class="sh">POINT OF WATER ENTRY</div><div class="bx">'+esc(entry)+'</div></div>':'';
@@ -778,7 +813,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     }).join('');
   }
   var maintH = maint?'<div class="secwrap"><div class="sh">MAINTENANCE</div><div class="bx" style="white-space:normal">'+maintHtml+'</div></div>':'';
-  var photoH = photos.length?'<div class="secwrap"><div class="sh">SITE PHOTOGRAPHS</div><table style="width:100%;border-collapse:collapse;margin-top:6px"><tbody>'+photoRows+'</tbody></table></div>':'';
+  var photoH = photos.length?'<div class="sh ph-head">SITE PHOTOGRAPHS</div><div style="margin-top:6px">'+photoRows+'</div>':'';
 
   var coverInfo = '';
   if(f.client) coverInfo += '<div>Prepared for: '+esc(f.client)+(f.ref?' &nbsp;|&nbsp; '+esc(f.ref):'')+'</div>';
@@ -824,6 +859,13 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.th{background:#2e2e2e;color:#fff;font-size:10px;font-weight:700;padding:5px 10px;text-align:left;border-bottom:3px solid #C8D400}' +
 '.tlabel{font-size:11px;color:#888;font-weight:600;width:140px;background:#f9f9f9}' +
 '.pfooter{border-top:1px solid #ddd;margin-top:12px;padding-top:5px;display:flex;justify-content:space-between;font-size:8px;color:#aaa}' +
+'.ph-head{page-break-after:avoid;break-after:avoid}' +
+'.ph-group{page-break-inside:avoid;break-inside:avoid}' +
+'.ph-row{display:flex;flex-wrap:nowrap;width:100%;page-break-inside:avoid;break-inside:avoid}' +
+'.ph-row.ph-first{page-break-before:avoid;break-before:avoid}' +
+'.ph-cell{flex:0 0 33.333%;width:33.333%;padding:5px;min-height:160px;box-sizing:border-box}' +
+'.ph-cell img{width:100%;height:120px;object-fit:cover;border:1px solid #ddd;display:block;border-radius:2px}' +
+'.ph-cap{font-size:9px;color:#888;font-style:italic;padding:3px 1px}' +
 '.savebtn{position:fixed;bottom:0;left:0;right:0;background:#C8D400;padding:12px 16px;text-align:center;z-index:999}' +
 '.savebtn button{background:#1a1a1a;color:#C8D400;border:none;padding:11px 0;font-size:15px;font-weight:700;border-radius:6px;cursor:pointer;width:100%;max-width:360px;font-family:inherit}' +
 '.savebtn p{color:#1a1a1a;font-size:10px;margin-top:4px}' +
