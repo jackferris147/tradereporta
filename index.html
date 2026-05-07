@@ -406,7 +406,15 @@ function saveJobsStore(){
   }
 }
 
-function saveDraftBtn(){ saveJob(); showToast('Draft saved'); }
+function saveDraftBtn(){
+  try {
+    var d = getJobData();
+    var i = jobs.findIndex(function(j){ return j.id===cid; });
+    if(i>=0) jobs[i]=d; else jobs.push(d);
+    saveJobsStore();
+    showToast('Draft saved');
+  } catch(e){ showToast('Save failed'); }
+}
 
 function getJobData(){
   return {
@@ -508,7 +516,7 @@ function openJob(id){
 }
 
 function parseWO(){
-  if(!getKey()){ goView('settings'); showToast('Add API key in Settings first'); return; }
+  if(!getKey()){ showToast('Add API key in Settings first'); return; }
   var text = g('wo-text').trim();
   if(!text){ showToast('Paste a work order first'); return; }
   document.getElementById('wo-btn').disabled = true;
@@ -588,7 +596,7 @@ function toggleRec(){
 }
 
 function doExpand(){
-  if(!getKey()){ goView('settings'); showToast('Add API key in Settings first'); return; }
+  if(!getKey()){ showToast('Add API key in Settings first'); return; }
   var raw = (g('voice-text')+'\n'+g('f-notes')).trim();
   if(!raw){ showToast('Add some notes first'); return; }
   var notes = raw.replace(/[\u2018\u2019\u201C\u201D\u2022]/g,"'").replace(/\*/g,'-').trim();
@@ -657,12 +665,13 @@ function renderPhotos(){
 
 function removePhoto(i){ photos.splice(i,1); renderPhotos(); }
 
-function matchPhotos(findingsText){
-  if(!photos||!photos.length) return findingsText;
+function matchPhotos(findingsText, src){
+  var pl = src || photos;
+  if(!pl||!pl.length) return findingsText;
   var lines = (findingsText||'').split('\n').filter(function(r){ return r.trim(); });
   var photoMap = [];
-  for(var j=0;j<photos.length;j++){
-    var cap = (photos[j].cap||'').toLowerCase().trim();
+  for(var j=0;j<pl.length;j++){
+    var cap = (pl[j].cap||'').toLowerCase().trim();
     if(!cap) continue;
     photoMap.push({num:j+1, cap:cap, words:cap.split(/[\s\/\-\_\,\.\(\)]+/).filter(function(w){ return w.length>2; })});
   }
@@ -692,7 +701,7 @@ function matchPhotos(findingsText){
 
 function generate(){
   if(!g('f-address')&&!g('f-client')){ showToast('Fill in address or client first'); return; }
-  if(!getKey()){ goView('settings'); showToast('Add API key in Settings first'); return; }
+  if(!getKey()){ showToast('Add API key in Settings first'); return; }
   busy=true; document.getElementById('gen-btn').disabled=true;
   setPill('gen-status','Generating report...','work'); saveJob();
   var scope=g('ai-scope'),findings=g('ai-findings'),entry=g('ai-entry');
@@ -722,12 +731,13 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 
 function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
+  var localPhotos = (photos||[]).slice();
   var f = getJobData();
   var isLeak = f.type==='leak';
   var title = isLeak?'LEAK INVESTIGATION REPORT':'ROOF INSPECTION REPORT';
   var sub = isLeak?'Insurance & Strata &mdash; Water Ingress Investigation':'Insurance & Strata &mdash; Roof Assessment';
 
-  findings = matchPhotos(findings);
+  findings = matchPhotos(findings, localPhotos);
 
   var cmVal = f.cm+(f.cmemail?' | '+f.cmemail:'');
   var insVal = f.insurer+(f.insurerref?' (Ref: '+f.insurerref+')':'');
@@ -780,7 +790,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     '</tr>';
   }).join('');
 
-  var pdfPhotos = photos.filter(function(p){ return p && p.url; });
+  var pdfPhotos = localPhotos.filter(function(p){ return p && p.url; });
   var phRows = [];
   for(var pi=0;pi<pdfPhotos.length;pi+=3){
     var rowCls = 'ph-row'+(pi===0?' ph-first':'');
