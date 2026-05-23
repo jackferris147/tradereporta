@@ -273,7 +273,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <audio id="rec-audio" controls></audio>
           <div class="recactions">
             <button class="ghostbtn" onclick="retakeRecording()">Retake</button>
-            <button class="aibtn" onclick="transcribeAndGenerate()">&#10022; Transcribe &amp; Generate Report</button>
+            <button class="ghostbtn" onclick="addMoreRecording()">+ Add More</button>
+            <button class="aibtn" onclick="generateReportFromTranscript()">&#10022; Generate Report</button>
           </div>
         </div>
         <div id="transcript-wrap" class="transcript-wrap" style="display:none">
@@ -308,7 +309,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="fld" style="margin-bottom:12px"><label>Findings (Area | Observation | Photos &mdash; one per line)</label><textarea id="ai-findings" style="min-height:130px;background:#fff;border:1px solid #E5E5E5;border-radius:6px;color:#111;font-family:inherit;font-size:14px;padding:9px 11px;width:100%;resize:vertical;line-height:1.5;outline:none"></textarea></div>
         <div class="fld" id="ai-entry-wrap" style="margin-bottom:12px;display:none"><label>Point of Water Entry</label><textarea id="ai-entry"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Causation</label><textarea id="ai-causation" class="lg"></textarea></div>
-        <div class="fld" style="margin-bottom:12px"><label>Maintenance Items</label><textarea id="ai-maint"></textarea></div>
+        <div class="fld" style="margin-bottom:12px"><label>Maintenance &mdash; Existing Issues Found</label><textarea id="ai-maint-existing" placeholder="Deferred maintenance or neglect found on site..."></textarea></div>
+        <div class="fld" style="margin-bottom:12px"><label>Maintenance &mdash; Recommended Going Forward</label><textarea id="ai-maint-recommended" placeholder="Maintenance work we recommend..."></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Recommendations (Priority: Action &mdash; one per line)</label><textarea id="ai-recs"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Conclusion</label><textarea id="ai-conclusion" class="lg"></textarea></div>
       </div>
@@ -350,7 +352,26 @@ var emrec = null, eachunks = [];
 var API = 'https://api.anthropic.com/v1/messages';
 var WHISPER_API = 'https://api.openai.com/v1/audio/transcriptions';
 var WHISPER_VOCAB = 'Roofing inspection report. Terms include: ridge cap, valley flashing, barge capping, head capping, sarking, battens, fascia, eaves, downpipe, box gutter, colorbond, decramastic, terracotta, mortar, repointing, silicone, flashing, membrane, skylights, penetrations, leaf guard';
-var REPORT_SYSTEM_PROMPT = "You are a professional report writer for JFR Roofing, a Gold Coast based roofing specialist. Write in the voice of an experienced Australian roofing tradesman - direct, factual, professional. No fluff, no padding. Short clear sentences.\n\nSTRICT RULES:\n- Each section must contain ONLY information relevant to that section\n- Never repeat the same information across sections\n- Findings: factual observations only, what was seen\n- Causation: why it happened, reference findings by area not repeat them word for word\n- Recommendations: what to do about it, do not repeat causation\n- Conclusion: brief summary only, one paragraph, no new information\n\nOUTPUT FORMAT - respond with exactly these tags, no other text:\n[SCOPE] one or two sentences starting with 'As requested, JFR Roofing attended site to...'\n[FINDINGS] one finding per line in format: Area | Observation\n[CAUSATION] two paragraphs maximum starting with 'Based on our inspection, it is the opinion of JFR Roofing that...'\n[MAINTENANCE] dot points or the word Nil\n[RECOMMENDATIONS]\nImmediate: text or Nil\nMaintenance: text or Nil\nMonitor: text or Nil\n[CONCLUSION] one paragraph starting with 'JFR Roofing has...'";
+var REPORT_SYSTEM_PROMPT = "You are a professional report writer for JFR Roofing, a Gold Coast based roofing specialist.\n\nWrite as an experienced Australian roofing tradesman explaining findings to an insurance assessor or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible. If technical terms are used explain them briefly.\n\nSTRICT RULES:\n- Each section must contain ONLY information relevant to that section\n- Never repeat the same information across sections\n- Findings: detailed factual observations. For each finding describe what was observed (the defect), where exactly on the roof, the extent or severity (minor, moderate, significant, or widespread), and any relevant context (age related, impact related, weather related)\n- Causation: why the issues happened, reference findings by area rather than repeating them word for word\n- Maintenance: split into Existing issues found during inspection and Recommended maintenance going forward\n- Recommendations: what to do about it, do not repeat causation\n- Conclusion: brief summary only, one paragraph, no new information\n\nOUTPUT FORMAT - respond with exactly these tags, no other text:\n[SCOPE] one or two sentences starting with 'As requested, JFR Roofing attended site to...'\n[FINDINGS] one finding per line in format: Area | Detailed observation including specific location, severity, and relevant context\n[CAUSATION] two paragraphs maximum starting with 'Based on our inspection, it is the opinion of JFR Roofing that...'\n[MAINTENANCE]\nExisting: dot points of maintenance issues found during inspection (or Nil)\nRecommended: dot points of maintenance work we recommend going forward (or Nil)\n[RECOMMENDATIONS]\nImmediate: text or Nil\nMaintenance: text or Nil\nMonitor: text or Nil\n[CONCLUSION] one paragraph starting with 'JFR Roofing has...'";
+
+function parseMaint(block){
+  if(!block) return {existing:'', recommended:''};
+  var lines = block.split('\n');
+  var current = null, anyLabel = false;
+  var existing = [], recommended = [];
+  lines.forEach(function(line){
+    var m = line.match(/^\s*(Existing|Recommended)\s*:\s*(.*)$/i);
+    if(m){
+      anyLabel = true;
+      current = m[1].toLowerCase()==='existing' ? existing : recommended;
+      if(m[2].trim()) current.push(m[2].trim());
+    } else if(current && line.trim()){
+      current.push(line);
+    }
+  });
+  if(!anyLabel) return {existing: block.trim(), recommended: ''};
+  return { existing: existing.join('\n').trim(), recommended: recommended.join('\n').trim() };
+}
 var EDIT_SYSTEM_PROMPT = "You are editing a roofing inspection report. You will receive the current report sections and an edit instruction. Make only the specific change requested. Do not change anything else. Return ALL sections in the original tag format even if unchanged.";
 
 var idb = null;
@@ -565,7 +586,9 @@ function getJobData(){
     roofmat:g('f-roofmat'), notes:g('f-notes'),
     transcript: document.getElementById('transcript').textContent || '',
     aiScope:g('ai-scope'), aiFindings:g('ai-findings'), aiEntry:g('ai-entry'),
-    aiCausation:g('ai-causation'), aiMaint:g('ai-maint'), aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion')
+    aiCausation:g('ai-causation'),
+    aiMaintExisting:g('ai-maint-existing'), aiMaintRecommended:g('ai-maint-recommended'),
+    aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion')
   };
 }
 
@@ -611,7 +634,7 @@ function renderJobs(){
 function clearForm(){
   var flds = ['client','ref','cm','cmemail','insurer','insurerref','customer','custphone','address','inspector','weather','roofmat','notes'];
   flds.forEach(function(f){ sv('f-'+f,''); });
-  var ais = ['scope','findings','entry','causation','maint','recs','conclusion'];
+  var ais = ['scope','findings','entry','causation','maint-existing','maint-recommended','recs','conclusion'];
   ais.forEach(function(f){ sv('ai-'+f,''); });
   sv('f-date', new Date().toISOString().split('T')[0]);
   sv('f-method','Walk Over - Internal & External');
@@ -654,7 +677,10 @@ function openJob(id){
   sv('f-inspector',j.inspector); sv('f-weather',j.weather); sv('f-method',j.method);
   sv('f-roofmat',j.roofmat); sv('f-notes',j.notes);
   sv('ai-scope',j.aiScope); sv('ai-findings',j.aiFindings); sv('ai-entry',j.aiEntry);
-  sv('ai-causation',j.aiCausation); sv('ai-maint',j.aiMaint); sv('ai-recs',j.aiRecs); sv('ai-conclusion',j.aiConclusion);
+  sv('ai-causation',j.aiCausation);
+  sv('ai-maint-existing', j.aiMaintExisting || j.aiMaint || '');
+  sv('ai-maint-recommended', j.aiMaintRecommended || '');
+  sv('ai-recs',j.aiRecs); sv('ai-conclusion',j.aiConclusion);
   if(j.transcript){
     document.getElementById('transcript').textContent = j.transcript;
     document.getElementById('transcript-wrap').style.display = 'block';
@@ -750,11 +776,17 @@ function toggleRec(){
       audioURL = URL.createObjectURL(audioBlob);
       document.getElementById('rec-audio').src = audioURL;
       document.getElementById('recplayback').style.display = 'block';
-      setPill('voice-status','Recording captured - review then Transcribe','done');
+      setPill('voice-status','Transcribing...','work');
+      whisperTranscribe(audioBlob).then(function(text){
+        var tEl = document.getElementById('transcript');
+        var existing = tEl.textContent || '';
+        tEl.textContent = existing ? (existing + '\n\n' + text) : text;
+        document.getElementById('transcript-wrap').style.display = 'block';
+        setPill('voice-status','Transcript captured - record more, retake, or generate','done');
+        saveJob();
+      }).catch(function(e){ setPill('voice-status','Transcription error: '+e.message,'err'); });
     };
     document.getElementById('recplayback').style.display = 'none';
-    document.getElementById('transcript-wrap').style.display = 'none';
-    document.getElementById('transcript').textContent = '';
     mrec.start();
     document.getElementById('rec-btn').classList.add('recording');
     document.getElementById('rec-label').textContent = 'Stop';
@@ -767,6 +799,11 @@ function toggleRec(){
     }, 1000);
     setPill('voice-status','Recording...','work');
   }).catch(function(){ setPill('voice-status','Microphone denied - type notes instead','err'); });
+}
+
+function addMoreRecording(){
+  if(mrec && mrec.state==='recording') return;
+  toggleRec();
 }
 
 function retakeRecording(){
@@ -804,18 +841,12 @@ function whisperTranscribe(blob){
   });
 }
 
-function transcribeAndGenerate(){
-  if(!audioBlob){ showToast('No recording to transcribe'); return; }
-  if(!getOpenAIKey()){ showToast('Add OpenAI key in Settings'); return; }
+function generateReportFromTranscript(){
+  var transcript = (document.getElementById('transcript').textContent || '').trim();
+  if(!transcript){ showToast('No transcript yet - record first'); return; }
   if(!getKey()){ showToast('Add Claude API key in Settings'); return; }
-  setPill('voice-status','Transcribing...','work');
-  whisperTranscribe(audioBlob).then(function(transcript){
-    document.getElementById('transcript').textContent = transcript;
-    document.getElementById('transcript-wrap').style.display = 'block';
-    setPill('voice-status','Transcribed - generating report...','work');
-    saveJob();
-    return runReportGen(transcript);
-  }).then(function(){
+  setPill('voice-status','Generating report...','work');
+  runReportGen(transcript).then(function(){
     setPill('voice-status','Report generated - review below','done');
   }).catch(function(e){ setPill('voice-status','Error: '+e.message,'err'); });
 }
@@ -858,7 +889,10 @@ function runReportGen(transcript){
       return (next===-1?text.substring(from):text.substring(from,next)).trim();
     }
     sv('ai-scope',ex('SCOPE')); sv('ai-findings',ex('FINDINGS')); sv('ai-entry',ex('ENTRY'));
-    sv('ai-causation',ex('CAUSATION')); sv('ai-maint',ex('MAINTENANCE'));
+    sv('ai-causation',ex('CAUSATION'));
+    var maintParts = parseMaint(ex('MAINTENANCE'));
+    sv('ai-maint-existing', maintParts.existing);
+    sv('ai-maint-recommended', maintParts.recommended);
     sv('ai-recs',ex('RECOMMENDATIONS')); sv('ai-conclusion',ex('CONCLUSION'));
     document.getElementById('sec-expanded').classList.add('on');
     document.getElementById('sec-expanded').style.display = 'block';
@@ -911,10 +945,13 @@ function applyEdit(){
   order = order.concat(['CAUSATION','MAINTENANCE','RECOMMENDATIONS','CONCLUSION']);
   var fieldMap = {
     SCOPE:'ai-scope', FINDINGS:'ai-findings', ENTRY:'ai-entry',
-    CAUSATION:'ai-causation', MAINTENANCE:'ai-maint',
+    CAUSATION:'ai-causation',
     RECOMMENDATIONS:'ai-recs', CONCLUSION:'ai-conclusion'
   };
   var currentBlock = order.map(function(tag){
+    if(tag === 'MAINTENANCE'){
+      return '[MAINTENANCE]\nExisting: ' + (g('ai-maint-existing') || 'Nil') + '\nRecommended: ' + (g('ai-maint-recommended') || 'Nil');
+    }
     return '['+tag+']\n' + (g(fieldMap[tag]) || '');
   }).join('\n\n');
   var userMsg = 'Current sections:\n\n' + currentBlock + '\n\nEdit instruction: ' + instr;
@@ -944,6 +981,12 @@ function applyEdit(){
     order.forEach(function(tag){
       var newVal = ex(tag);
       if(newVal === null) return;
+      if(tag === 'MAINTENANCE'){
+        var p = parseMaint(newVal);
+        if(g('ai-maint-existing') !== p.existing){ sv('ai-maint-existing', p.existing); changes++; }
+        if(g('ai-maint-recommended') !== p.recommended){ sv('ai-maint-recommended', p.recommended); changes++; }
+        return;
+      }
       var fid = fieldMap[tag];
       if(g(fid) !== newVal){
         sv(fid, newVal);
@@ -1035,15 +1078,17 @@ function generate(){
   busy=true; document.getElementById('gen-btn').disabled=true;
   setPill('gen-status','Generating report...','work'); saveJob();
   var findings=g('ai-findings'),entry=g('ai-entry');
-  var causation=g('ai-causation'),maint=g('ai-maint'),recs=g('ai-recs'),conclusion=g('ai-conclusion');
-  buildReport(scope,findings,entry,causation,maint,recs,conclusion);
+  var causation=g('ai-causation');
+  var maintEx=g('ai-maint-existing'), maintRec=g('ai-maint-recommended');
+  var recs=g('ai-recs'),conclusion=g('ai-conclusion');
+  buildReport(scope,findings,entry,causation,maintEx,maintRec,recs,conclusion);
 }
 
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*/g,'').replace(/\*/g,''); }
 
 
 
-function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
+function buildReport(scope,findings,entry,causation,maintEx,maintRec,recs,conclusion){
   var localPhotos = (photos||[]).slice();
   var f = getJobData();
   var isLeak = f.type==='leak';
@@ -1131,10 +1176,8 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
   }
 
   var entryH = (isLeak&&entry&&entry!=='N/A')?'<div class="secwrap"><div class="sh">POINT OF WATER ENTRY</div><div class="bx">'+esc(entry)+'</div></div>':'';
-  var maintHtml = '';
-  if(maint){
-    var maintLines = maint.split('\n');
-    maintHtml = maintLines.map(function(ml){
+  function fmtMaintLines(text){
+    return text.split('\n').map(function(ml){
       var t = ml.toLowerCase();
       var col = '#222';
       if(/immediate|urgent|safety|danger/.test(t)) col='#cc0000';
@@ -1143,7 +1186,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
       return ml.trim()?'<span style="color:'+col+';display:block">'+esc(ml)+'</span>':ml;
     }).join('');
   }
-  var maintH = maint?'<div class="secwrap"><div class="sh">MAINTENANCE</div><div class="bx" style="white-space:normal">'+maintHtml+'</div></div>':'';
+  var maintInner = '';
+  if(maintEx && maintEx.trim()) maintInner += '<div style="font-weight:700;font-size:11px;color:#555;margin:4px 0 4px;letter-spacing:0.3px">EXISTING ISSUES FOUND</div>' + fmtMaintLines(maintEx);
+  if(maintRec && maintRec.trim()) maintInner += '<div style="font-weight:700;font-size:11px;color:#555;margin:'+(maintEx?'10px':'4px')+' 0 4px;letter-spacing:0.3px">RECOMMENDED MAINTENANCE</div>' + fmtMaintLines(maintRec);
+  var maintH = maintInner?'<div class="secwrap"><div class="sh">MAINTENANCE</div><div class="bx" style="white-space:normal">'+maintInner+'</div></div>':'';
   var photoH = pdfPhotos.length?'<div class="sh ph-head">SITE PHOTOGRAPHS</div><div style="margin-top:6px">'+photoRows+'</div>':'';
 
   var coverInfo = '';
