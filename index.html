@@ -106,6 +106,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .toast.on{opacity:1}
 .keyinput{flex:1;background:#fff;border:1px solid #E5E5E5;border-radius:6px;color:#111;font-family:inherit;font-size:14px;padding:9px 11px;outline:none}
 .keyinput:focus{border-color:#C8D400}
+.recblock{display:flex;align-items:center;gap:14px;padding:14px;background:#FAFAFA;border:1px solid #EBEBEB;border-radius:10px;margin-bottom:10px}
+.bigrec{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;border:2px solid #E5E5E5;border-radius:10px;color:#111;font-size:16px;font-weight:700;padding:16px;cursor:pointer;font-family:inherit}
+.bigrec.recording{background:#FEF2F2;border-color:#FCA5A5;color:#DC2626}
+.bigrec.recording .recdot{animation:blink 1s infinite}
+.rectime{font-size:18px;font-weight:700;color:#666;font-variant-numeric:tabular-nums;min-width:54px;text-align:center}
+.recplayback{background:#FAFAFA;border:1px solid #EBEBEB;border-radius:10px;padding:14px;margin-bottom:10px}
+.recplayback audio{width:100%;margin-bottom:10px;display:block}
+.recactions{display:flex;gap:10px;align-items:stretch}
+.recactions .aibtn{flex:1;margin-top:0}
+.ghostbtn{background:#fff;border:1px solid #E5E5E5;border-radius:6px;color:#666;font-size:13px;font-weight:600;padding:9px 16px;cursor:pointer;font-family:inherit}
+.transcript-wrap{margin-bottom:14px}
+.tlabel{display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:6px}
+.transcript{background:#FAFAFA;border:1px solid #EBEBEB;border-radius:6px;padding:10px 12px;font-size:13px;line-height:1.5;color:#333;white-space:pre-wrap;max-height:200px;overflow-y:auto}
+.editbar{display:flex;gap:8px;align-items:center;padding:10px;background:#FAFAFA;border:1px solid #EBEBEB;border-radius:8px;margin-bottom:10px}
+.editbar .micbtn{background:#fff;border:1px solid #E5E5E5;border-radius:6px;padding:8px 12px;font-size:16px;cursor:pointer;font-family:inherit;line-height:1}
+.editbar .micbtn.recording{background:#FEF2F2;border-color:#FCA5A5;color:#DC2626;animation:blink 1s infinite}
+.editbar input{flex:1;background:#fff;border:1px solid #E5E5E5;border-radius:6px;color:#111;font-family:inherit;font-size:13px;padding:8px 11px;outline:none;min-width:0}
+.editbar input:focus{border-color:#C8D400}
+.editbar .aibtn{margin-top:0;padding:8px 14px}
 </style>
 </head>
 <body>
@@ -142,6 +161,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <button class="pbtn" onclick="saveKey()">Save</button>
       </div>
       <div id="key-status"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">OpenAI API Key (for voice transcription)</div>
+      <div class="card-sub">Used only for Whisper voice transcription. Stored in your browser only.<br>Get yours at <strong>platform.openai.com</strong> &rarr; API keys.</div>
+      <div style="display:flex;gap:8px">
+        <input type="password" class="keyinput" id="openai-key-input" placeholder="sk-...">
+        <button class="pbtn" onclick="saveOpenAIKey()">Save</button>
+      </div>
+      <div id="openai-key-status"></div>
     </div>
     <div class="card">
       <div class="card-title">About</div>
@@ -233,29 +261,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
       <div class="secbody">
         <p style="font-size:13px;color:#888;margin-bottom:14px;line-height:1.5">Record your inspection or type notes &mdash; AI writes the formal report sections.</p>
-        <div class="recbox">
-          <div class="rectop">
-            <span class="reclbl">&#127897; Recorder</span>
-            <div style="display:flex;align-items:center;gap:10px">
-              <span id="rec-time" style="font-size:13px;font-weight:600;color:#DC2626;display:none">0:00</span>
-              <button class="recbtn" id="rec-btn" onclick="toggleRec()"><span class="recdot"></span> Record</button>
-            </div>
+        <div class="recblock">
+          <button class="bigrec" id="rec-btn" onclick="toggleRec()">
+            <span class="recdot"></span>
+            <span id="rec-label">Record</span>
+          </button>
+          <div id="rec-time" class="rectime">0:00</div>
+        </div>
+        <div id="voice-status"></div>
+        <div id="recplayback" class="recplayback" style="display:none">
+          <audio id="rec-audio" controls></audio>
+          <div class="recactions">
+            <button class="ghostbtn" onclick="retakeRecording()">Retake</button>
+            <button class="aibtn" onclick="transcribeAndGenerate()">&#10022; Transcribe &amp; Generate Report</button>
           </div>
-          <div id="voice-status"></div>
-          <div class="vnotes" id="voice-notes">
-            <div class="fld" style="margin-bottom:10px">
-              <label>Notes &mdash; edit freely</label>
-              <textarea id="voice-text" style="background:#FAFAFA;border:1px solid #EBEBEB;border-radius:6px;color:#111;font-family:inherit;font-size:14px;line-height:1.5;padding:9px 11px;width:100%;resize:vertical;min-height:90px;outline:none" placeholder="Your notes..."></textarea>
-            </div>
-            <button class="aibtn" onclick="doExpand()">&#10022; Expand into Report Sections</button>
-          </div>
+        </div>
+        <div id="transcript-wrap" class="transcript-wrap" style="display:none">
+          <label class="tlabel">Transcript</label>
+          <div id="transcript" class="transcript"></div>
         </div>
         <div class="fld">
           <label>Or type notes directly</label>
           <textarea id="f-notes" class="lg" placeholder="What you saw on site, cause of damage, recommendations..."></textarea>
         </div>
         <div id="expand-typed-wrap" style="display:none">
-          <button class="aibtn" onclick="doExpand()">&#10022; Expand Notes into Report Sections</button>
+          <button class="aibtn" onclick="runReportGenFromTyped()">&#10022; Expand Notes into Report Sections</button>
         </div>
         <div id="expand-status"></div>
       </div>
@@ -267,7 +297,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <span class="secarr">&#8964;</span>
       </div>
       <div class="secbody">
-        <p style="font-size:13px;color:#888;margin-bottom:14px">Review and edit each section before generating the PDF.</p>
+        <p style="font-size:13px;color:#888;margin-bottom:10px">Review and edit each section before generating the PDF.</p>
+        <div class="editbar">
+          <button id="edit-rec-btn" class="micbtn" onclick="toggleEditRec()" title="Voice edit">&#127897;</button>
+          <input id="edit-text" type="text" placeholder="Type an edit instruction or tap mic...">
+          <button id="edit-apply-btn" class="aibtn" onclick="applyEdit()">Apply</button>
+        </div>
+        <div id="edit-status" style="margin-bottom:10px"></div>
         <div class="fld" style="margin-bottom:12px"><label>Scope of Works</label><textarea id="ai-scope" class="lg"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Findings (Area | Observation | Photos &mdash; one per line)</label><textarea id="ai-findings" style="min-height:130px;background:#fff;border:1px solid #E5E5E5;border-radius:6px;color:#111;font-family:inherit;font-size:14px;padding:9px 11px;width:100%;resize:vertical;line-height:1.5;outline:none"></textarea></div>
         <div class="fld" id="ai-entry-wrap" style="margin-bottom:12px;display:none"><label>Point of Water Entry</label><textarea id="ai-entry"></textarea></div>
@@ -309,7 +345,13 @@ var LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAADbQAAAmxCAYAAAAzDJ9VAA
 var jobs = (function(){ try { return JSON.parse(localStorage.getItem('tr_jobs') || '[]'); } catch(e){ return []; } })();
 var cid = null, jtype = 'roof', photos = [], busy = false, photosLoaded = false;
 var mrec = null, achunks = [], rtimer = null, rsecs = 0;
+var audioBlob = null, audioURL = null;
+var emrec = null, eachunks = [];
 var API = 'https://api.anthropic.com/v1/messages';
+var WHISPER_API = 'https://api.openai.com/v1/audio/transcriptions';
+var WHISPER_VOCAB = 'Roofing inspection report. Terms include: ridge cap, valley flashing, barge capping, head capping, sarking, battens, fascia, eaves, downpipe, box gutter, colorbond, decramastic, terracotta, mortar, repointing, silicone, flashing, membrane, skylights, penetrations, leaf guard';
+var REPORT_SYSTEM_PROMPT = "You are a professional report writer for JFR Roofing, a Gold Coast based roofing specialist. Write in the voice of an experienced Australian roofing tradesman - direct, factual, professional. No fluff, no padding. Short clear sentences.\n\nSTRICT RULES:\n- Each section must contain ONLY information relevant to that section\n- Never repeat the same information across sections\n- Findings: factual observations only, what was seen\n- Causation: why it happened, reference findings by area not repeat them word for word\n- Recommendations: what to do about it, do not repeat causation\n- Conclusion: brief summary only, one paragraph, no new information\n\nOUTPUT FORMAT - respond with exactly these tags, no other text:\n[SCOPE] one or two sentences starting with 'As requested, JFR Roofing attended site to...'\n[FINDINGS] one finding per line in format: Area | Observation\n[CAUSATION] two paragraphs maximum starting with 'Based on our inspection, it is the opinion of JFR Roofing that...'\n[MAINTENANCE] dot points or the word Nil\n[RECOMMENDATIONS]\nImmediate: text or Nil\nMaintenance: text or Nil\nMonitor: text or Nil\n[CONCLUSION] one paragraph starting with 'JFR Roofing has...'";
+var EDIT_SYSTEM_PROMPT = "You are editing a roofing inspection report. You will receive the current report sections and an edit instruction. Make only the specific change requested. Do not change anything else. Return ALL sections in the original tag format even if unchanged.";
 
 var idb = null;
 function openIDB(){
@@ -387,6 +429,7 @@ function compressImage(file){
 }
 
 function getKey(){ return localStorage.getItem('tr_key') || ''; }
+function getOpenAIKey(){ return localStorage.getItem('tr_openai_key') || ''; }
 function hdrs(){
   var h = {};
   h['Content-Type'] = 'application/json';
@@ -400,6 +443,8 @@ window.addEventListener('load', function(){
   var k = getKey();
   if(k){ document.getElementById('key-input').value = k; setPill('key-status','API key saved','done'); }
   else { setTimeout(function(){ showToast('Add your API key in Settings'); },1200); }
+  var ok = getOpenAIKey();
+  if(ok){ document.getElementById('openai-key-input').value = ok; setPill('openai-key-status','OpenAI key saved','done'); }
   renderJobs();
   var s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -470,6 +515,14 @@ function saveKey(){
   showToast('API key saved');
 }
 
+function saveOpenAIKey(){
+  var k = document.getElementById('openai-key-input').value.trim();
+  if(!k.startsWith('sk-')){ setPill('openai-key-status','Invalid - should start with sk-','err'); return; }
+  localStorage.setItem('tr_openai_key', k);
+  setPill('openai-key-status','OpenAI key saved - voice transcription active','done');
+  showToast('OpenAI key saved');
+}
+
 function saveJobsStore(){
   try {
     var textOnly = jobs.map(function(j){
@@ -510,6 +563,7 @@ function getJobData(){
     custphone:g('f-custphone'), address:g('f-address'), date:g('f-date'),
     inspector:g('f-inspector'), weather:g('f-weather'), method:g('f-method'),
     roofmat:g('f-roofmat'), notes:g('f-notes'),
+    transcript: document.getElementById('transcript').textContent || '',
     aiScope:g('ai-scope'), aiFindings:g('ai-findings'), aiEntry:g('ai-entry'),
     aiCausation:g('ai-causation'), aiMaint:g('ai-maint'), aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion')
   };
@@ -561,13 +615,20 @@ function clearForm(){
   ais.forEach(function(f){ sv('ai-'+f,''); });
   sv('f-date', new Date().toISOString().split('T')[0]);
   sv('f-method','Walk Over - Internal & External');
-  sv('wo-text',''); sv('voice-text','');
+  sv('wo-text','');
   document.getElementById('photo-grid').innerHTML = '';
-  document.getElementById('voice-notes').classList.remove('on');
   document.getElementById('sec-expanded').classList.remove('on');
   document.getElementById('sec-expanded').style.display = 'none';
-  ['voice-status','wo-status','expand-status','gen-status'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML=''; });
+  ['voice-status','wo-status','expand-status','gen-status','edit-status'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML=''; });
   document.getElementById('expand-typed-wrap').style.display = 'none';
+  document.getElementById('recplayback').style.display = 'none';
+  document.getElementById('transcript-wrap').style.display = 'none';
+  document.getElementById('transcript').textContent = '';
+  document.getElementById('rec-audio').src = '';
+  document.getElementById('rec-time').textContent = '0:00';
+  document.getElementById('edit-text').value = '';
+  if(audioURL){ URL.revokeObjectURL(audioURL); audioURL = null; }
+  audioBlob = null;
   photos = [];
   switchTab('import');
 }
@@ -594,6 +655,10 @@ function openJob(id){
   sv('f-roofmat',j.roofmat); sv('f-notes',j.notes);
   sv('ai-scope',j.aiScope); sv('ai-findings',j.aiFindings); sv('ai-entry',j.aiEntry);
   sv('ai-causation',j.aiCausation); sv('ai-maint',j.aiMaint); sv('ai-recs',j.aiRecs); sv('ai-conclusion',j.aiConclusion);
+  if(j.transcript){
+    document.getElementById('transcript').textContent = j.transcript;
+    document.getElementById('transcript-wrap').style.display = 'block';
+  }
   if(j.aiScope){ document.getElementById('sec-expanded').classList.add('on'); document.getElementById('sec-expanded').style.display='block'; }
   photos = [];
   photosLoaded = false;
@@ -667,27 +732,34 @@ function handlePDF(e){
 }
 
 function toggleRec(){
-  if(mrec&&mrec.state==='recording'){
+  if(mrec && mrec.state==='recording'){
     mrec.stop(); clearInterval(rtimer);
     document.getElementById('rec-btn').classList.remove('recording');
-    document.getElementById('rec-btn').innerHTML = '<span class="recdot"></span> Record';
-    document.getElementById('rec-time').style.display = 'none';
+    document.getElementById('rec-label').textContent = 'Record';
     return;
   }
+  if(!getOpenAIKey()){ showToast('Add OpenAI key in Settings for voice transcription'); return; }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
     achunks = [];
     mrec = new MediaRecorder(stream);
     mrec.ondataavailable = function(e){ achunks.push(e.data); };
     mrec.onstop = function(){
       stream.getTracks().forEach(function(t){ t.stop(); });
-      document.getElementById('voice-notes').classList.add('on');
-      setPill('voice-status','Recording saved - tap Expand to write your report','done');
+      if(audioURL){ URL.revokeObjectURL(audioURL); audioURL = null; }
+      audioBlob = new Blob(achunks, {type: mrec.mimeType || 'audio/webm'});
+      audioURL = URL.createObjectURL(audioBlob);
+      document.getElementById('rec-audio').src = audioURL;
+      document.getElementById('recplayback').style.display = 'block';
+      setPill('voice-status','Recording captured - review then Transcribe','done');
     };
+    document.getElementById('recplayback').style.display = 'none';
+    document.getElementById('transcript-wrap').style.display = 'none';
+    document.getElementById('transcript').textContent = '';
     mrec.start();
     document.getElementById('rec-btn').classList.add('recording');
-    document.getElementById('rec-btn').innerHTML = '<span class="recdot"></span> Stop';
-    document.getElementById('rec-time').style.display = 'block';
+    document.getElementById('rec-label').textContent = 'Stop';
     rsecs = 0;
+    document.getElementById('rec-time').textContent = '0:00';
     rtimer = setInterval(function(){
       rsecs++;
       var m = Math.floor(rsecs/60), s = rsecs%60;
@@ -697,20 +769,85 @@ function toggleRec(){
   }).catch(function(){ setPill('voice-status','Microphone denied - type notes instead','err'); });
 }
 
-function doExpand(){
-  if(!getKey()){ showToast('Add API key in Settings first'); return; }
-  var raw = (g('voice-text')+'\n'+g('f-notes')).trim();
-  if(!raw){ showToast('Add some notes first'); return; }
-  var notes = raw.replace(/[\u2018\u2019\u201C\u201D\u2022]/g,"'").replace(/\*/g,'-').trim();
+function retakeRecording(){
+  if(audioURL){ URL.revokeObjectURL(audioURL); audioURL = null; }
+  audioBlob = null;
+  document.getElementById('rec-audio').src = '';
+  document.getElementById('recplayback').style.display = 'none';
+  document.getElementById('transcript-wrap').style.display = 'none';
+  document.getElementById('transcript').textContent = '';
+  setPill('voice-status','','');
+  toggleRec();
+}
+
+function whisperTranscribe(blob){
+  if(!getOpenAIKey()) return Promise.reject(new Error('OpenAI key required'));
+  var ext = 'webm';
+  var t = (blob.type||'').toLowerCase();
+  if(t.indexOf('mp4')>=0 || t.indexOf('aac')>=0) ext = 'm4a';
+  else if(t.indexOf('ogg')>=0) ext = 'ogg';
+  else if(t.indexOf('wav')>=0) ext = 'wav';
+  var fd = new FormData();
+  fd.append('file', blob, 'recording.'+ext);
+  fd.append('model', 'whisper-1');
+  fd.append('language', 'en');
+  fd.append('prompt', WHISPER_VOCAB);
+  return fetch(WHISPER_API, {
+    method:'POST',
+    headers:{ 'Authorization': 'Bearer ' + getOpenAIKey() },
+    body: fd
+  }).then(function(r){
+    return r.json().then(function(data){
+      if(!r.ok) throw new Error((data.error && data.error.message) || 'Whisper error');
+      return data.text || '';
+    });
+  });
+}
+
+function transcribeAndGenerate(){
+  if(!audioBlob){ showToast('No recording to transcribe'); return; }
+  if(!getOpenAIKey()){ showToast('Add OpenAI key in Settings'); return; }
+  if(!getKey()){ showToast('Add Claude API key in Settings'); return; }
+  setPill('voice-status','Transcribing...','work');
+  whisperTranscribe(audioBlob).then(function(transcript){
+    document.getElementById('transcript').textContent = transcript;
+    document.getElementById('transcript-wrap').style.display = 'block';
+    setPill('voice-status','Transcribed - generating report...','work');
+    saveJob();
+    return runReportGen(transcript);
+  }).then(function(){
+    setPill('voice-status','Report generated - review below','done');
+  }).catch(function(e){ setPill('voice-status','Error: '+e.message,'err'); });
+}
+
+function runReportGen(transcript){
+  if(!getKey()){ showToast('Add Claude API key in Settings'); return Promise.reject(new Error('No Claude key')); }
+  var clean = (transcript||'').replace(/[\u2018\u2019\u201C\u201D\u2022]/g,"'").replace(/\*/g,'-').trim();
+  if(!clean){ showToast('No content to expand'); return Promise.reject(new Error('Empty input')); }
   busy = true;
   document.getElementById('gen-btn').disabled = true;
   setPill('expand-status','AI writing your report sections...','work');
-  var type = jtype==='roof'?'Roof Inspection':'Leak Investigation';
-  var ep = jtype==='leak'?'numbered entry points':'N/A';
-  var addr = g('f-address')||'the property';
-  var prompt = 'You are writing a professional '+type+' report for JFR Roofing Pty Ltd (NSW Licence 381433C) at '+addr+'.\n\nInspector notes:\n'+notes+'\n\nWrite in the style of a professional roofing inspector. Be brief, factual, specific. No markdown, no asterisks.\n\nRespond with ONLY these labelled sections:\n\n[SCOPE]\nOne or two sentences starting with: As requested, JFR Roofing attended site to...\n\n[FINDINGS]\nEach finding: Area | Clear factual observation (1-2 sentences) | #1\nOne finding per line. No asterisks or markdown.\n\n[ENTRY]\n'+ep+'\n\n[CAUSATION]\nTwo concise paragraphs starting with: Based on our inspection, it is the opinion of JFR Roofing that...\n\n[MAINTENANCE]\nBrief dot point list of deferred maintenance items, or Nil.\n\n[RECOMMENDATIONS]\nImmediate: action\nMaintenance: action\nMonitor: action\n\n[CONCLUSION]\nOne paragraph starting with: JFR Roofing has...';
-  fetch(API,{method:'POST',headers:hdrs(),body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1500,messages:[{role:'user',content:prompt}]})})
-  .then(function(r){ return r.json(); }).then(function(data){
+  var addr = g('f-address') || 'the property';
+  var typeLbl = jtype === 'leak' ? 'leak' : 'roof';
+  var systemPrompt = REPORT_SYSTEM_PROMPT;
+  if(jtype === 'leak'){
+    systemPrompt = systemPrompt.replace(
+      "[CAUSATION] two paragraphs",
+      "[ENTRY] one sentence describing where water is entering the building.\n[CAUSATION] two paragraphs"
+    );
+  }
+  var userMsg = 'Inspection type: ' + typeLbl + ' | Address: ' + addr + '\n\nTranscript:\n' + clean;
+  return fetch(API, {
+    method:'POST', headers:hdrs(),
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: [{role:'user', content: userMsg}]
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
     if(data.error) throw new Error(data.error.message);
     var text = data.content[0].text;
     function ex(tag){
@@ -728,8 +865,97 @@ function doExpand(){
     setPill('expand-status','Report sections written - review below','done');
     showToast('Report sections generated');
     saveJob();
-  }).catch(function(e){ setPill('expand-status','Error: '+e.message,'err'); })
+  })
+  .catch(function(e){ setPill('expand-status','Error: '+e.message,'err'); throw e; })
   .finally(function(){ busy=false; document.getElementById('gen-btn').disabled=false; });
+}
+
+function runReportGenFromTyped(){
+  var notes = g('f-notes').trim();
+  if(!notes){ showToast('Type some notes first'); return; }
+  runReportGen(notes).catch(function(){});
+}
+
+function toggleEditRec(){
+  if(emrec && emrec.state==='recording'){
+    emrec.stop();
+    document.getElementById('edit-rec-btn').classList.remove('recording');
+    return;
+  }
+  if(!getOpenAIKey()){ showToast('Add OpenAI key in Settings for voice edits'); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    eachunks = [];
+    emrec = new MediaRecorder(stream);
+    emrec.ondataavailable = function(e){ eachunks.push(e.data); };
+    emrec.onstop = function(){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      var blob = new Blob(eachunks, {type: emrec.mimeType || 'audio/webm'});
+      setPill('edit-status','Transcribing edit...','work');
+      whisperTranscribe(blob).then(function(text){
+        document.getElementById('edit-text').value = text;
+        setPill('edit-status','Review the edit instruction, then tap Apply','done');
+      }).catch(function(e){ setPill('edit-status','Transcription error: '+e.message,'err'); });
+    };
+    emrec.start();
+    document.getElementById('edit-rec-btn').classList.add('recording');
+    setPill('edit-status','Recording edit instruction...','work');
+  }).catch(function(){ setPill('edit-status','Microphone denied','err'); });
+}
+
+function applyEdit(){
+  if(!getKey()){ showToast('Add Claude API key in Settings'); return; }
+  var instr = document.getElementById('edit-text').value.trim();
+  if(!instr){ showToast('Type or speak an edit instruction first'); return; }
+  var order = ['SCOPE','FINDINGS'];
+  if(jtype === 'leak') order.push('ENTRY');
+  order = order.concat(['CAUSATION','MAINTENANCE','RECOMMENDATIONS','CONCLUSION']);
+  var fieldMap = {
+    SCOPE:'ai-scope', FINDINGS:'ai-findings', ENTRY:'ai-entry',
+    CAUSATION:'ai-causation', MAINTENANCE:'ai-maint',
+    RECOMMENDATIONS:'ai-recs', CONCLUSION:'ai-conclusion'
+  };
+  var currentBlock = order.map(function(tag){
+    return '['+tag+']\n' + (g(fieldMap[tag]) || '');
+  }).join('\n\n');
+  var userMsg = 'Current sections:\n\n' + currentBlock + '\n\nEdit instruction: ' + instr;
+  setPill('edit-status','Applying edit...','work');
+  document.getElementById('edit-apply-btn').disabled = true;
+  fetch(API, {
+    method:'POST', headers:hdrs(),
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      system: EDIT_SYSTEM_PROMPT,
+      messages: [{role:'user', content: userMsg}]
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.error) throw new Error(data.error.message);
+    var text = data.content[0].text;
+    function ex(tag){
+      var start = text.indexOf('['+tag+']');
+      if(start===-1) return null;
+      var from = start+tag.length+2;
+      var next = text.indexOf('[',from);
+      return (next===-1?text.substring(from):text.substring(from,next)).trim();
+    }
+    var changes = 0;
+    order.forEach(function(tag){
+      var newVal = ex(tag);
+      if(newVal === null) return;
+      var fid = fieldMap[tag];
+      if(g(fid) !== newVal){
+        sv(fid, newVal);
+        changes++;
+      }
+    });
+    setPill('edit-status', changes ? ('Updated '+changes+' section'+(changes>1?'s':'')) : 'No changes', changes ? 'done' : '');
+    document.getElementById('edit-text').value = '';
+    saveJob();
+  })
+  .catch(function(e){ setPill('edit-status','Error: '+e.message,'err'); })
+  .finally(function(){ document.getElementById('edit-apply-btn').disabled = false; });
 }
 
 function readPhotosOrdered(files){
@@ -804,28 +1030,13 @@ function matchPhotos(findingsText, src){
 function generate(){
   if(!g('f-address')&&!g('f-client')){ showToast('Fill in address or client first'); return; }
   if(!getKey()){ showToast('Add API key in Settings first'); return; }
+  var scope=g('ai-scope');
+  if(!scope){ showToast('Transcribe or expand notes first'); return; }
   busy=true; document.getElementById('gen-btn').disabled=true;
   setPill('gen-status','Generating report...','work'); saveJob();
-  var scope=g('ai-scope'),findings=g('ai-findings'),entry=g('ai-entry');
+  var findings=g('ai-findings'),entry=g('ai-entry');
   var causation=g('ai-causation'),maint=g('ai-maint'),recs=g('ai-recs'),conclusion=g('ai-conclusion');
-  var notes = (g('voice-text')+'\n'+g('f-notes')).trim();
-  if(notes&&!scope){
-    setPill('gen-status','AI writing report...','work');
-    var type = jtype==='roof'?'Roof Inspection':'Leak Investigation';
-    var ep = jtype==='leak'?'numbered':'N/A';
-    var cleanNotes = notes.replace(/[\u2018\u2019\u201C\u201D\u2022]/g,"'").replace(/\*/g,'-').trim();
-    fetch(API,{method:'POST',headers:hdrs(),body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1500,messages:[{role:'user',content:'Write '+type+' report sections for JFR Roofing at '+(g('f-address')||'the property')+'.\nNotes: '+cleanNotes+'\nRespond with ONLY:\n[SCOPE]\nOne sentence.\n[FINDINGS]\nArea | Observation | #\n[ENTRY]\n'+ep+'\n[CAUSATION]\nTwo paragraphs.\n[MAINTENANCE]\nItems or Nil.\n[RECOMMENDATIONS]\nImmediate: x\nMaintenance: x\nMonitor: x\n[CONCLUSION]\nOne paragraph.'}]})})
-    .then(function(r){ return r.json(); }).then(function(data){
-      if(data.error) throw new Error(data.error.message);
-      var text = data.content[0].text;
-      function ex(tag){ var s=text.indexOf('['+tag+']'); if(s===-1)return''; var f=s+tag.length+2; var n=text.indexOf('[',f); return(n===-1?text.substring(f):text.substring(f,n)).trim(); }
-      scope=ex('SCOPE'); findings=ex('FINDINGS'); entry=ex('ENTRY');
-      causation=ex('CAUSATION'); maint=ex('MAINTENANCE'); recs=ex('RECOMMENDATIONS'); conclusion=ex('CONCLUSION');
-      buildReport(scope,findings,entry,causation,maint,recs,conclusion);
-    }).catch(function(e){ setPill('gen-status','Error: '+e.message,'err'); busy=false; document.getElementById('gen-btn').disabled=false; });
-  } else {
-    buildReport(scope,findings,entry,causation,maint,recs,conclusion);
-  }
+  buildReport(scope,findings,entry,causation,maint,recs,conclusion);
 }
 
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*/g,'').replace(/\*/g,''); }
