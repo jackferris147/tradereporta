@@ -192,20 +192,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <label>Logo</label>
         <input type="file" id="brand-logo-input" accept="image/*" onchange="handleBrandLogo(event)" style="font-size:13px">
         <img id="brand-logo-preview" class="brand-logo-preview" style="display:none" alt="Logo preview">
+        <button type="button" class="ghostbtn" onclick="pickColourFromLogo()" style="margin-top:6px;font-size:12px;padding:6px 12px">Pick colour from logo</button>
       </div>
-      <div class="brand-row">
-        <div class="brand-fld" style="flex:0 0 auto">
-          <label>Accent Colour</label>
-          <input type="color" id="brand-colour" class="brand-color" value="#C8D400">
+      <div class="brand-fld">
+        <label>Accent Colour</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="color" id="brand-colour" class="brand-color" value="#C8D400" oninput="checkColourWarning()">
+          <a href="#" onclick="resetBrandColour();return false" style="font-size:12px;color:#999;text-decoration:underline">Reset to default</a>
         </div>
-        <div class="brand-fld">
-          <label>Report Style</label>
-          <select id="brand-style">
-            <option value="professional">Professional (dark cover)</option>
-            <option value="clean">Clean (white cover)</option>
-            <option value="bold">Bold (accent cover)</option>
-          </select>
-        </div>
+        <div id="brand-colour-warn" style="display:none;font-size:11px;color:#cc8800;margin-top:6px">This colour may be hard to read on dark backgrounds</div>
+      </div>
+      <div class="brand-fld">
+        <label>Report Style</label>
+        <select id="brand-style">
+          <option value="professional">Professional (dark cover)</option>
+          <option value="clean">Clean (white cover)</option>
+        </select>
       </div>
       <button class="pbtn" onclick="saveBranding()" style="width:100%;margin-top:6px">Save Branding</button>
       <div id="brand-status"></div>
@@ -444,22 +446,20 @@ function idbDelete(id){
   });
 }
 
-function compressImage(file, maxW, quality, format){
-  maxW = maxW || 1200;
-  quality = quality || 0.7;
-  format = format || 'image/jpeg';
+function compressImage(file){
   return new Promise(function(resolve, reject){
     var r = new FileReader();
     r.onload = function(ev){
       var img = new Image();
       img.onload = function(){
+        var maxW = 1200;
         var w = img.width, h = img.height;
         if(w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
         var canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         try {
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(format === 'image/png' ? canvas.toDataURL('image/png') : canvas.toDataURL(format, quality));
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
         } catch(e){ reject(e); }
       };
       img.onerror = function(){ reject(new Error('image decode failed')); };
@@ -470,6 +470,28 @@ function compressImage(file, maxW, quality, format){
   });
 }
 
+function compressBrandLogo(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var maxW = 800;
+      var scale = Math.min(1, maxW / img.width);
+      var w = Math.round(img.width * scale);
+      var h = Math.round(img.height * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/png'));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function brandTextOn(hex){
   var h = (hex||'').replace('#','');
   if(h.length !== 6) return '#111';
@@ -478,18 +500,6 @@ function brandTextOn(hex){
   var b = parseInt(h.substr(4,2),16);
   var luma = (0.299*r + 0.587*g + 0.114*b) / 255;
   return luma > 0.55 ? '#111' : '#fff';
-}
-
-function darkenHex(hex, factor){
-  var h = (hex||'').replace('#','');
-  if(h.length !== 6) return hex;
-  var parts = [];
-  for(var i=0;i<3;i++){
-    var v = Math.round(parseInt(h.substr(i*2,2),16) * factor);
-    var s = v.toString(16);
-    parts.push(s.length===1?'0'+s:s);
-  }
-  return '#' + parts.join('');
 }
 
 function getBrand(){
@@ -517,13 +527,81 @@ function saveBranding(){
 
 function handleBrandLogo(e){
   var file = e.target.files[0]; if(!file) return; e.target.value='';
-  compressImage(file, 800, undefined, 'image/png').then(function(dataUrl){
+  compressBrandLogo(file, function(dataUrl){
     localStorage.setItem('tr_brand_logo', dataUrl);
     var img = document.getElementById('brand-logo-preview');
     img.src = dataUrl;
     img.style.display = 'block';
     showToast('Logo saved');
-  }).catch(function(){ showToast('Logo upload failed'); });
+  });
+}
+
+function resetBrandColour(){
+  var el = document.getElementById('brand-colour');
+  if(el) el.value = '#C8D400';
+  localStorage.setItem('tr_brand_colour', '#C8D400');
+  checkColourWarning();
+  showToast('Accent colour reset');
+}
+
+function pickColourFromLogo(){
+  var src = localStorage.getItem('tr_brand_logo');
+  if(!src){ showToast('Upload a logo first'); return; }
+  var img = new Image();
+  img.onload = function(){
+    var maxW = 200;
+    var scale = Math.min(1, maxW / img.width);
+    var w = Math.max(1, Math.round(img.width * scale));
+    var h = Math.max(1, Math.round(img.height * scale));
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    var data;
+    try { data = ctx.getImageData(0, 0, w, h).data; }
+    catch(e){ showToast('Cannot read logo pixels'); return; }
+    var buckets = {};
+    for(var i=0;i<data.length;i+=4){
+      var r=data[i], g=data[i+1], b=data[i+2], a=data[i+3];
+      if(a < 128) continue;
+      if(r > 230 && g > 230 && b > 230) continue;
+      if(r < 25 && g < 25 && b < 25) continue;
+      var key = (r>>5)+','+(g>>5)+','+(b>>5);
+      if(!buckets[key]) buckets[key] = {count:0, r:0, g:0, b:0};
+      buckets[key].count++;
+      buckets[key].r += r; buckets[key].g += g; buckets[key].b += b;
+    }
+    var top = null;
+    for(var k in buckets){ if(!top || buckets[k].count > top.count) top = buckets[k]; }
+    if(!top){ showToast('No dominant colour found'); return; }
+    var ar = Math.round(top.r / top.count);
+    var ag = Math.round(top.g / top.count);
+    var ab = Math.round(top.b / top.count);
+    var hex = '#' + [ar,ag,ab].map(function(c){
+      var s = c.toString(16);
+      return s.length === 1 ? '0'+s : s;
+    }).join('');
+    var picker = document.getElementById('brand-colour');
+    if(picker) picker.value = hex;
+    localStorage.setItem('tr_brand_colour', hex);
+    checkColourWarning();
+    showToast('Accent set to ' + hex);
+  };
+  img.onerror = function(){ showToast('Could not load logo'); };
+  img.src = src;
+}
+
+function checkColourWarning(){
+  var el = document.getElementById('brand-colour');
+  var warn = document.getElementById('brand-colour-warn');
+  if(!el || !warn) return;
+  var h = (el.value||'').replace('#','');
+  if(h.length !== 6){ warn.style.display = 'none'; return; }
+  var r = parseInt(h.substr(0,2),16);
+  var g = parseInt(h.substr(2,2),16);
+  var b = parseInt(h.substr(4,2),16);
+  var luma = (0.299*r + 0.587*g + 0.114*b) / 255;
+  warn.style.display = luma < 0.15 ? 'block' : 'none';
 }
 
 function loadBrandingFields(){
@@ -542,6 +620,7 @@ function loadBrandingFields(){
     if(logo){ preview.src = logo; preview.style.display = 'block'; }
     else { preview.style.display = 'none'; }
   }
+  checkColourWarning();
 }
 
 function getKey(){ return localStorage.getItem('tr_key') || ''; }
@@ -1182,19 +1261,13 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     cinfoPanelBg='#f5f5f5'; cinfoCol='#444'; cfootCol='#888';
     cdivCol=brandColour; csubCol=brandColour;
     cstripeBg=brandColour; cstrongCol='#1a1a1a';
-  } else if(brand.style === 'bold'){
-    var contrast = brandTextOn(brandColour);
-    coverBg=brandColour; coverTitleCol=contrast;
-    cinfoPanelBg=(contrast==='#fff')?'rgba(0,0,0,0.25)':'rgba(255,255,255,0.4)';
-    cinfoCol=contrast; cfootCol=contrast;
-    cdivCol=contrast; csubCol=contrast;
-    cstripeBg=darkenHex(brandColour, 0.5); cstrongCol=contrast;
   } else {
     coverBg='#2e2e2e'; coverTitleCol='#fff';
     cinfoPanelBg='#111'; cinfoCol='#aaa'; cfootCol='#555';
     cdivCol=brandColour; csubCol=brandColour;
     cstripeBg=brandColour; cstrongCol='#ccc';
   }
+  var phdrLogoFilter = (brand.logo === LOGO) ? 'brightness(0) invert(1)' : 'none';
   var brandCompanyEsc = esc(brand.company);
   var brandAbnDisp = brand.abn ? 'ABN: ' + esc(brand.abn) : '';
   var brandLicEsc = esc(brand.licence);
@@ -1322,8 +1395,8 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
 /* ---- COVER ---- */
 '.cover{position:relative;width:210mm;height:272mm;overflow:hidden;page-break-after:always;break-after:page;background:'+coverBg+';margin:0;padding:0}' +
-'.ctop-stripe{position:absolute;top:0;left:0;right:0;height:14px;background:'+cstripeBg+'}' +
-'.cbot-stripe{position:absolute;bottom:0;left:0;right:0;height:14px;background:'+cstripeBg+'}' +
+'.ctop-stripe{position:absolute;top:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
+'.cbot-stripe{position:absolute;bottom:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cmid{position:absolute;top:14px;left:0;right:0;bottom:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 40px}' +
 '.clogo{width:480px;max-width:80%}' +
 '.cdiv{border:none;border-top:1.5px solid '+cdivCol+';width:320px;max-width:70%;margin:18px auto}' +
@@ -1339,7 +1412,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.page>thead>tr>td{padding:0;border:0}' +
 '.page>tbody>tr>td{padding:10mm;border:0;vertical-align:top}' +
 '.phdr{background:#2e2e2e;display:flex;align-items:center;justify-content:space-between;padding:8px 14px 5px;border-bottom:3px solid '+brandColour+';margin-bottom:12px}' +
-'.phdr-logo{height:36px;filter:brightness(0) invert(1)}' +
+'.phdr-logo{height:36px;filter:'+phdrLogoFilter+'}' +
 '.phdr-r{text-align:right}' +
 '.phdr-title{font-size:10px;font-weight:700;color:#fff;letter-spacing:0.5px;text-transform:uppercase}' +
 '.phdr-ref{font-size:8px;color:#aaa}' +
