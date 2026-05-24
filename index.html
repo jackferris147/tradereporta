@@ -1297,7 +1297,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     cstripeBg=brandColour; cstrongCol='#ccc';
   }
   var phdrLogoFilter = (brand.logo === LOGO) ? 'brightness(0) invert(1)' : 'none';
-  var clogoFilter = (brand.logo === LOGO) ? 'brightness(0) invert(1)' : 'none';
+  var clogoFilter = (brand.logo === LOGO && brand.style !== 'clean') ? 'brightness(0) invert(1)' : 'none';
   var brandCompanyEsc = esc(brand.company);
   var brandAbnDisp = brand.abn ? 'ABN: ' + esc(brand.abn) : '';
   var brandLicEsc = esc(brand.licence);
