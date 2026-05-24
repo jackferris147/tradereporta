@@ -1297,6 +1297,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     cstripeBg=brandColour; cstrongCol='#ccc';
   }
   var phdrLogoFilter = (brand.logo === LOGO) ? 'brightness(0) invert(1)' : 'none';
+  var clogoFilter = (brand.logo === LOGO) ? 'brightness(0) invert(1)' : 'none';
   var brandCompanyEsc = esc(brand.company);
   var brandAbnDisp = brand.abn ? 'ABN: ' + esc(brand.abn) : '';
   var brandLicEsc = esc(brand.licence);
@@ -1427,7 +1428,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.ctop-stripe{position:absolute;top:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cbot-stripe{position:absolute;bottom:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cmid{position:absolute;top:14px;left:0;right:0;bottom:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 40px}' +
-'.clogo{width:480px;max-width:80%}' +
+'.clogo{width:480px;max-width:80%;filter:'+clogoFilter+'}' +
 '.cdiv{border:none;border-top:1.5px solid '+cdivCol+';width:320px;max-width:70%;margin:18px auto}' +
 '.ctitle{color:'+coverTitleCol+';font-size:24px;font-weight:800;margin-bottom:10px}' +
 '.csub{color:'+csubCol+';font-size:12px;font-weight:700;font-style:italic}' +
