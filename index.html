@@ -444,9 +444,10 @@ function idbDelete(id){
   });
 }
 
-function compressImage(file, maxW, quality){
+function compressImage(file, maxW, quality, format){
   maxW = maxW || 1200;
   quality = quality || 0.7;
+  format = format || 'image/jpeg';
   return new Promise(function(resolve, reject){
     var r = new FileReader();
     r.onload = function(ev){
@@ -458,7 +459,7 @@ function compressImage(file, maxW, quality){
         canvas.width = w; canvas.height = h;
         try {
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', quality));
+          resolve(format === 'image/png' ? canvas.toDataURL('image/png') : canvas.toDataURL(format, quality));
         } catch(e){ reject(e); }
       };
       img.onerror = function(){ reject(new Error('image decode failed')); };
@@ -516,7 +517,7 @@ function saveBranding(){
 
 function handleBrandLogo(e){
   var file = e.target.files[0]; if(!file) return; e.target.value='';
-  compressImage(file, 800, 0.85).then(function(dataUrl){
+  compressImage(file, 800, undefined, 'image/png').then(function(dataUrl){
     localStorage.setItem('tr_brand_logo', dataUrl);
     var img = document.getElementById('brand-logo-preview');
     img.src = dataUrl;
