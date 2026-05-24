@@ -1,0 +1,19 @@
+{
+  "name": "tradereporta-pdf",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker that renders Trade Reporta inspection-report HTML into A4 PDFs using @cloudflare/puppeteer.",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "^0.0.14"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

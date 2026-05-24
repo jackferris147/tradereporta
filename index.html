@@ -391,6 +391,10 @@ var audioBlob = null, audioURL = null;
 var emrec = null, eachunks = [];
 var API = 'https://api.anthropic.com/v1/messages';
 var WHISPER_API = 'https://api.openai.com/v1/audio/transcriptions';
+// PDF Worker (Cloudflare Browser Rendering). Leave blank to fall back to the
+// in-browser print-dialog flow. Fill these in after `wrangler deploy`.
+var PDF_WORKER_URL = 'https://tradereporta-pdf.jack-6c8.workers.dev';
+var PDF_WORKER_SECRET = '880b21218cd734647d227a318adfa0f0e6ff2d2f97ec5a545138cc34c0706550';   // matches the PDF_SECRET set on the Worker
 var WHISPER_VOCAB = 'Roofing inspection report. Terms include: ridge cap, valley flashing, barge capping, head capping, sarking, battens, fascia, eaves, downpipe, box gutter, colorbond, decramastic, terracotta, mortar, repointing, silicone, flashing, membrane, skylights, penetrations, leaf guard';
 var REPORT_SYSTEM_PROMPT = "You are a professional report writer for JFR Roofing, a Gold Coast based roofing specialist.\n\nWrite as an experienced Australian roofing tradesman explaining findings to an insurance assessor or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible. If technical terms are used explain them briefly.\n\nSTRICT RULES:\n- Each section must contain ONLY information relevant to that section\n- Never repeat the same information across sections\n- Findings: detailed factual observations. For each finding describe what was observed (the defect), where exactly on the roof, the extent or severity (minor, moderate, significant, or widespread), and any relevant context (age related, impact related, weather related)\n- Causation: why the issues happened, reference findings by area rather than repeating them word for word\n- Maintenance: list maintenance issues found during the inspection as clear dot points, one issue per dot point. For each item state whether it is related or unrelated to the claim or event, roughly how long it has likely been present, and whether the owner would reasonably have been aware. Do not include recommendations here - only describe what was found. If no maintenance issues were found, write exactly: No maintenance issues were identified during the inspection\n- Recommendations: each priority row should be 1-2 sentences describing specific work and its purpose. Do not repeat causation\n- Conclusion: brief summary only, one paragraph, no new information\n\nOUTPUT FORMAT - respond with exactly these tags, no other text:\n[SCOPE] one or two sentences starting with 'As requested, JFR Roofing attended site to...'\n[FINDINGS] one finding per line in format: Area | Detailed observation including specific location, severity, and relevant context\n[CAUSATION] two paragraphs maximum starting with 'Based on our inspection, it is the opinion of JFR Roofing that...'\n[MAINTENANCE] clear dot points describing each maintenance issue found, including whether it is related to the claim, likely duration, and whether the owner would have been aware; or the sentence 'No maintenance issues were identified during the inspection'\n[RECOMMENDATIONS]\nImmediate: 1-2 sentences describing urgent action and its purpose (e.g. 'All hail-damaged broken tiles should be identified and replaced across the full roof surface to stop ongoing water entry.'), or Nil\nMaintenance: 1-2 sentences describing planned maintenance work (e.g. 'Valley clips should be installed on the small valley tiles during the tile replacement works. Gutters to be cleared at the same time.'), or Nil\nMonitor: 1-2 sentences describing what to monitor after repairs (e.g. 'Once repairs are completed, internal ceiling areas should be monitored for any further signs of moisture to confirm the source has been fully resolved.'), or Nil\n[CONCLUSION] one paragraph starting with 'JFR Roofing has...'";
 var EDIT_SYSTEM_PROMPT = "You are editing a roofing inspection report. You will receive the current report sections and an edit instruction. Make only the specific change requested. Do not change anything else. Return ALL sections in the original tag format even if unchanged.";
@@ -1421,10 +1425,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '*{box-sizing:border-box;margin:0;padding:0}' +
 'html,body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
 '@page{size:A4 portrait;margin:0}' +
-'@media print{html{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important;padding:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.savebtn{display:none!important}.cover{page-break-after:always;break-after:page;overflow:hidden!important;height:272mm!important;max-height:272mm!important;margin-bottom:-1px!important}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
+'@media print{html{margin:0!important;padding:0!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{margin:0!important;padding:0!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.cover{page-break-after:always;break-after:page;overflow:hidden!important;height:297mm!important;max-height:297mm!important;margin-bottom:-1px!important}.pgbreak{page-break-before:always;break-before:page}.sh{page-break-after:avoid;break-after:avoid}.bx{page-break-before:avoid;break-before:avoid}tr{page-break-inside:avoid;break-inside:avoid}}' +
 
 /* ---- COVER ---- */
-'.cover{position:relative;width:210mm;height:272mm;overflow:hidden;page-break-after:always;break-after:page;background:'+coverBg+';margin:0;padding:0}' +
+'.cover{position:relative;width:210mm;height:297mm;overflow:hidden;page-break-after:always;break-after:page;background:'+coverBg+';margin:0;padding:0}' +
 '.ctop-stripe{position:absolute;top:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cbot-stripe{position:absolute;bottom:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cmid{position:absolute;top:14px;left:0;right:0;bottom:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 40px}' +
@@ -1461,16 +1465,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.ph-cell{flex:0 0 33.333%;width:33.333%;padding:5px;min-height:160px;box-sizing:border-box}' +
 '.ph-cell img{width:100%;height:120px;object-fit:cover;border:1px solid #ddd;display:block;border-radius:2px}' +
 '.ph-cap{font-size:9px;color:#888;font-style:italic;padding:3px 1px}' +
-'.savebtn{position:fixed;bottom:0;left:0;right:0;background:'+brandColour+';padding:12px 16px;text-align:center;z-index:999}' +
-'.savebtn button{background:#1a1a1a;color:'+brandColour+';border:none;padding:11px 0;font-size:15px;font-weight:700;border-radius:6px;cursor:pointer;width:100%;max-width:360px;font-family:inherit}' +
-'.savebtn p{color:#1a1a1a;font-size:10px;margin-top:4px}' +
 '</style></head><body>' +
 
-/* ---- SAVE BUTTON ---- */
-'<div class="savebtn"><button id="pdf-btn" onclick="savePDF()">Save as PDF</button><p id="pdf-tip">Opens print dialog &mdash; choose Save as PDF</p></div>' +
-
 /* ---- REPORT CONTENT ---- */
-'<div id="report" style="width:210mm;margin:0;">' +
+'<div id="report" style="width:210mm;margin:0 auto;">' +
 '<div class="cover">' +
   '<div class="ctop-stripe"></div>' +
   '<div class="cbot-stripe"></div>' +
@@ -1539,12 +1537,40 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
   '</td></tr></tbody>' +
 '</table>' +
 '</div>' +
-'<scr'+'ipt>' +
-'function savePDF(){window.print();}' +
-'<\/scr'+'ipt>' +
 '</body></html>';
 
-  // Open report in new tab - user taps Save as PDF button in the report
+  var filename = ((f.address || 'report') + '.pdf').replace(/[^\w.\-]/g, '_');
+
+  if(PDF_WORKER_URL && PDF_WORKER_SECRET){
+    // PDF Worker flow: server-side render via Cloudflare Browser Rendering.
+    setPill('gen-status','Rendering PDF...','work');
+    fetch(PDF_WORKER_URL + '/render', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'X-PDF-Secret':PDF_WORKER_SECRET },
+      body: JSON.stringify({ html: html, filename: filename })
+    })
+    .then(function(r){
+      if(!r.ok) return r.text().then(function(t){ throw new Error('Render failed ('+r.status+'): '+(t||'').slice(0,200)); });
+      return r.blob();
+    })
+    .then(function(blob){
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+      setPill('gen-status','PDF downloaded','done');
+      saveJob('done');
+    })
+    .catch(function(e){ setPill('gen-status','Error: '+e.message,'err'); })
+    .finally(function(){
+      busy = false;
+      document.getElementById('gen-btn').disabled = false;
+    });
+    return;
+  }
+
+  // Fallback: open report in new tab; user taps Save as PDF (legacy path).
   var blob = new Blob([html], {type:'text/html;charset=utf-8'});
   var url = URL.createObjectURL(blob);
   var w = window.open(url, '_blank');

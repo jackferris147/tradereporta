@@ -1,0 +1,11 @@
+name = "tradereporta-pdf"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Browser Rendering binding (requires Workers Paid plan)
+[browser]
+binding = "BROWSER"
+
+# PDF_SECRET is set as a runtime secret via `wrangler secret put PDF_SECRET`
+# Do NOT put the secret value in this file.
