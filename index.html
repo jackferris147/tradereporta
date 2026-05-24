@@ -471,10 +471,12 @@ function compressImage(file){
 }
 
 function compressBrandLogo(file, callback) {
+  console.log('[brand-logo] compressBrandLogo called - source file type:', file.type, 'size:', file.size);
   var reader = new FileReader();
   reader.onload = function(e) {
     var img = new Image();
     img.onload = function() {
+      console.log('[brand-logo] source image loaded:', img.width, 'x', img.height);
       var maxW = 800;
       var scale = Math.min(1, maxW / img.width);
       var w = Math.round(img.width * scale);
@@ -485,7 +487,9 @@ function compressBrandLogo(file, callback) {
       var ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
-      callback(canvas.toDataURL('image/png'));
+      var dataUrl = canvas.toDataURL('image/png');
+      console.log('[brand-logo] output prefix:', dataUrl.substring(0, 22), 'length:', dataUrl.length);
+      callback(dataUrl);
     };
     img.src = e.target.result;
   };
@@ -526,8 +530,10 @@ function saveBranding(){
 }
 
 function handleBrandLogo(e){
+  console.log('[brand-logo] handleBrandLogo entered');
   var file = e.target.files[0]; if(!file) return; e.target.value='';
   compressBrandLogo(file, function(dataUrl){
+    console.log('[brand-logo] saving to localStorage, mime prefix:', dataUrl.substring(0, 22));
     localStorage.setItem('tr_brand_logo', dataUrl);
     var img = document.getElementById('brand-logo-preview');
     img.src = dataUrl;
@@ -544,36 +550,59 @@ function resetBrandColour(){
   showToast('Accent colour reset');
 }
 
+function rgbToHue(r, g, b){
+  var rn = r/255, gn = g/255, bn = b/255;
+  var max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  if(max === min) return 0;
+  var d = max - min, h;
+  switch(max){
+    case rn: h = (gn - bn) / d + (gn < bn ? 6 : 0); break;
+    case gn: h = (bn - rn) / d + 2; break;
+    default: h = (rn - gn) / d + 4;
+  }
+  return (h / 6) * 360;
+}
+
 function pickColourFromLogo(){
   var src = localStorage.getItem('tr_brand_logo');
   if(!src){ showToast('Upload a logo first'); return; }
   var img = new Image();
   img.onload = function(){
-    var maxW = 200;
+    var maxW = 300;
     var scale = Math.min(1, maxW / img.width);
     var w = Math.max(1, Math.round(img.width * scale));
     var h = Math.max(1, Math.round(img.height * scale));
     var canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
     var data;
     try { data = ctx.getImageData(0, 0, w, h).data; }
     catch(e){ showToast('Cannot read logo pixels'); return; }
-    var buckets = {};
+    var hueBuckets = {};
+    var examined = 0, colourful = 0;
     for(var i=0;i<data.length;i+=4){
       var r=data[i], g=data[i+1], b=data[i+2], a=data[i+3];
       if(a < 128) continue;
-      if(r > 230 && g > 230 && b > 230) continue;
-      if(r < 25 && g < 25 && b < 25) continue;
-      var key = (r>>5)+','+(g>>5)+','+(b>>5);
-      if(!buckets[key]) buckets[key] = {count:0, r:0, g:0, b:0};
-      buckets[key].count++;
-      buckets[key].r += r; buckets[key].g += g; buckets[key].b += b;
+      examined++;
+      if(r > 220 && g > 220 && b > 220) continue;                                 // white
+      if(r < 30 && g < 30 && b < 30) continue;                                    // black
+      if(Math.abs(r-g) < 20 && Math.abs(g-b) < 20 && Math.abs(r-b) < 20) continue; // grey
+      colourful++;
+      var hue = rgbToHue(r, g, b);
+      var bucket = Math.floor(hue / 15);
+      if(!hueBuckets[bucket]) hueBuckets[bucket] = {count:0, r:0, g:0, b:0};
+      hueBuckets[bucket].count++;
+      hueBuckets[bucket].r += r; hueBuckets[bucket].g += g; hueBuckets[bucket].b += b;
+    }
+    console.log('[brand-logo] pickColour - examined', examined, 'opaque pixels,', colourful, 'colourful');
+    if(colourful === 0){
+      showToast('Could not detect a brand colour - please select manually');
+      return;
     }
     var top = null;
-    for(var k in buckets){ if(!top || buckets[k].count > top.count) top = buckets[k]; }
-    if(!top){ showToast('No dominant colour found'); return; }
+    for(var k in hueBuckets){ if(!top || hueBuckets[k].count > top.count) top = hueBuckets[k]; }
     var ar = Math.round(top.r / top.count);
     var ag = Math.round(top.g / top.count);
     var ab = Math.round(top.b / top.count);
