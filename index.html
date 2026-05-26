@@ -396,8 +396,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="fld" style="margin-bottom:12px"><label>Scope of Works</label><textarea id="ai-scope" class="lg"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Findings (Area | Observation | Photos &mdash; one per line)</label><textarea id="ai-findings" style="min-height:130px;background:#fff;border:1px solid #E5E5E5;border-radius:6px;color:#111;font-family:inherit;font-size:14px;padding:9px 11px;width:100%;resize:vertical;line-height:1.5;outline:none"></textarea></div>
         <div class="fld" id="ai-entry-wrap" style="margin-bottom:12px;display:none"><label>Point of Water Entry</label><textarea id="ai-entry"></textarea></div>
-        <div class="fld" style="margin-bottom:12px"><label>Causation</label><textarea id="ai-causation" class="lg"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Maintenance Items</label><textarea id="ai-maint" placeholder="Maintenance issues found, claim relation, likely duration..."></textarea></div>
+        <div class="fld" style="margin-bottom:12px"><label>Causation</label><textarea id="ai-causation" class="lg"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Recommendations (Priority: Action &mdash; one per line)</label><textarea id="ai-recs"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Conclusion</label><textarea id="ai-conclusion" class="lg"></textarea></div>
       </div>
@@ -1567,8 +1567,8 @@ function previewSections(){
   if(jtype === 'leak' && (g('ai-entry')||'').trim()){
     arr.push({ key:'ai-entry', label:'Point of Water Entry', type:'text' });
   }
-  arr.push({ key:'ai-causation', label:'Causation',         type:'text' });
   arr.push({ key:'ai-maint',     label:'Maintenance',       type:'text' });
+  arr.push({ key:'ai-causation', label:'Causation',         type:'text' });
   arr.push({ key:'ai-recs',      label:'Recommendations',   type:'recs' });
   arr.push({ key:'ai-conclusion',label:'Conclusion',        type:'text' });
   return arr;
@@ -1849,7 +1849,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.ctop-stripe{position:absolute;top:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cbot-stripe{position:absolute;bottom:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cmid{position:absolute;top:14px;left:0;right:0;bottom:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 40px}' +
-'.clogo{width:760px;max-width:75%;filter:'+clogoFilter+';image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;-webkit-font-smoothing:antialiased;transform:translateZ(0);-webkit-transform:translateZ(0)}' +
+'.clogo{width:280px;max-width:60%;filter:'+clogoFilter+';image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;-webkit-font-smoothing:antialiased;transform:translateZ(0);-webkit-transform:translateZ(0)}' +
 '.cdiv{border:none;border-top:1.5px solid '+cdivCol+';width:320px;max-width:70%;margin:18px auto}' +
 '.ctitle{color:'+coverTitleCol+';font-size:24px;font-weight:800;margin-bottom:10px}' +
 '.csub{color:'+csubCol+';font-size:12px;font-weight:700;font-style:italic}' +
@@ -1925,10 +1925,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 
   entryH +
 
+  maintH +
+
   '<div class="secwrap"><div class="sh">Causation</div>' +
   '<div class="bx">'+esc(causation||'')+'</div></div>' +
-
-  maintH +
 
   '<div class="secwrap"><div class="sh">Recommendations</div>' +
   '<table><thead><tr>' +
