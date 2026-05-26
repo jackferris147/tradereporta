@@ -1800,7 +1800,8 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     for(var pj=0;pj<3;pj++){
       var ph = pdfPhotos[pi+pj];
       if(ph){
-        rowHtml += '<div class="ph-cell"><img src="'+ph.url+'"><div class="ph-cap">Photo '+(pi+pj+1)+(ph.cap?' - '+esc(ph.cap):'')+'</div></div>';
+        var phClass = ph.orientation === 'portrait' ? 'ph-cell ph-portrait' : 'ph-cell ph-landscape';
+        rowHtml += '<div class="'+phClass+'"><img src="'+ph.url+'"><div class="ph-cap">Photo '+(pi+pj+1)+(ph.cap?' - '+esc(ph.cap):'')+'</div></div>';
       } else {
         rowHtml += '<div class="ph-cell"></div>';
       }
@@ -1885,7 +1886,9 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.ph-row.ph-first{page-break-before:avoid;break-before:avoid}' +
 '.ph-row{align-items:flex-start}' +
 '.ph-cell{flex:0 0 33.333%;width:33.333%;padding:5px;box-sizing:border-box}' +
-'.ph-cell img{width:100%;height:auto;border:1px solid #ddd;display:block;border-radius:2px}' +
+'.ph-cell img{width:100%;border:1px solid #ddd;display:block;border-radius:2px;object-fit:cover}' +
+'.ph-cell.ph-landscape img{height:150px}' +
+'.ph-cell.ph-portrait img{height:200px}' +
 '.ph-cap{font-size:9px;color:#888;font-style:italic;padding:3px 1px}' +
 '</style></head><body>' +
 
