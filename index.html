@@ -525,14 +525,15 @@ function compressImage(file){
     r.onload = function(ev){
       var img = new Image();
       img.onload = function(){
+        var natW = img.width, natH = img.height;
         var maxW = 1200;
-        var w = img.width, h = img.height;
+        var w = natW, h = natH;
         if(w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
         var canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         try {
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
+          resolve({ url: canvas.toDataURL('image/jpeg', 0.7), width: natW, height: natH });
         } catch(e){ reject(e); }
       };
       img.onerror = function(){ reject(new Error('image decode failed')); };
@@ -1477,8 +1478,11 @@ function readPhotosOrdered(files){
   for(var i=0;i<files.length;i++){ photos.push({url:'',cap:'',loading:true}); }
   renderPhotos();
   files.forEach(function(file, i){
-    compressImage(file).then(function(dataUrl){
-      photos[startIdx+i].url = dataUrl;
+    compressImage(file).then(function(res){
+      photos[startIdx+i].url = res.url;
+      photos[startIdx+i].width = res.width;
+      photos[startIdx+i].height = res.height;
+      photos[startIdx+i].orientation = res.width > res.height ? 'landscape' : 'portrait';
       photos[startIdx+i].loading = false;
       renderPhotos();
     }).catch(function(){
@@ -1849,7 +1853,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.ctop-stripe{position:absolute;top:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cbot-stripe{position:absolute;bottom:0;left:0;right:0;height:12px;background:'+cstripeBg+'}' +
 '.cmid{position:absolute;top:14px;left:0;right:0;bottom:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 40px}' +
-'.clogo{width:280px;max-width:60%;filter:'+clogoFilter+';image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;-webkit-font-smoothing:antialiased;transform:translateZ(0);-webkit-transform:translateZ(0)}' +
+'.clogo{width:320px;max-width:65%;filter:'+clogoFilter+';image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;-webkit-font-smoothing:antialiased;transform:translateZ(0);-webkit-transform:translateZ(0)}' +
 '.cdiv{border:none;border-top:1.5px solid '+cdivCol+';width:320px;max-width:70%;margin:18px auto}' +
 '.ctitle{color:'+coverTitleCol+';font-size:24px;font-weight:800;margin-bottom:10px}' +
 '.csub{color:'+csubCol+';font-size:12px;font-weight:700;font-style:italic}' +
@@ -1879,8 +1883,9 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
 '.ph-group{page-break-inside:avoid;break-inside:avoid}' +
 '.ph-row{display:flex;flex-wrap:nowrap;width:100%;page-break-inside:avoid;break-inside:avoid}' +
 '.ph-row.ph-first{page-break-before:avoid;break-before:avoid}' +
-'.ph-cell{flex:0 0 33.333%;width:33.333%;padding:5px;min-height:160px;box-sizing:border-box}' +
-'.ph-cell img{width:100%;height:120px;object-fit:cover;border:1px solid #ddd;display:block;border-radius:2px}' +
+'.ph-row{align-items:flex-start}' +
+'.ph-cell{flex:0 0 33.333%;width:33.333%;padding:5px;box-sizing:border-box}' +
+'.ph-cell img{width:100%;height:auto;border:1px solid #ddd;display:block;border-radius:2px}' +
 '.ph-cap{font-size:9px;color:#888;font-style:italic;padding:3px 1px}' +
 '</style></head><body>' +
 
