@@ -151,6 +151,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .brand-row > .brand-fld{flex:1;margin-bottom:0}
 .brand-color{width:54px;height:38px;border:1px solid #E5E5E5;border-radius:6px;padding:2px;cursor:pointer;background:#fff}
 .brand-logo-preview{display:block;width:120px;height:auto;margin:8px 0 4px;border-radius:6px;padding:0;border:none;background-color:transparent;background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%);background-size:8px 8px;background-position:0 0,0 4px,4px -4px,-4px 0px}
+.preview-cta{width:100%;font-size:15px;padding:13px;margin-bottom:14px;background:#1a1a1a;color:#C8D400}
+.preview-back{background:none;border:none;color:#999;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:18px;padding:0;font-family:inherit}
+.preview-section{margin-bottom:22px;cursor:pointer;border-radius:8px;padding:6px 4px;transition:background 0.1s}
+.preview-section:hover{background:#fafafa}
+.preview-section.editing{cursor:default;background:#fafafa;padding:14px;border:1px solid #C8D400;border-radius:8px}
+.preview-section.editing:hover{background:#fafafa}
+.preview-heading{display:inline-block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:#C8D400;color:#1a1a1a;padding:5px 10px;border-radius:4px;margin-bottom:10px}
+.preview-body{font-size:15px;line-height:1.6;color:#222;white-space:pre-wrap;padding:0 4px}
+.preview-body.empty{color:#bbb;font-style:italic}
+.preview-table{width:100%;border-collapse:collapse;margin-top:6px}
+.preview-table th{background:#2e2e2e;color:#fff;font-size:11px;text-align:left;padding:8px 12px;font-weight:700;letter-spacing:0.5px}
+.preview-table td{background:#fff;font-size:14px;padding:10px 12px;border:1px solid #ddd;color:#222;vertical-align:top;line-height:1.5}
+.preview-table tbody tr:nth-child(even) td{background:#f9f9f9}
+.preview-table td.preview-area{font-weight:700;color:#111;width:30%}
+.preview-table td.preview-pri{font-weight:700;width:32%}
+.preview-editor{width:100%;min-height:80px;background:#fff;border:1px solid #E5E5E5;border-radius:6px;font-family:inherit;font-size:16px;line-height:1.5;padding:12px;outline:none;resize:none;color:#111;box-sizing:border-box;overflow:hidden}
+.preview-editor:focus{border-color:#C8D400}
+.preview-editor-actions{display:flex;gap:10px;margin-top:10px;justify-content:flex-end}
+.rec-error-row{margin-top:10px;padding:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px}
+.rec-error-msg{color:#cc0000;font-size:13px;line-height:1.5;margin-bottom:10px}
+.rec-error-row .aibtn{margin-top:0}
 </style>
 </head>
 <body>
@@ -335,6 +356,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <button class="ghostbtn" onclick="addMoreRecording()">+ Add More</button>
             <button class="aibtn" onclick="generateReportFromTranscript()">&#10022; Generate Report</button>
           </div>
+          <div id="rec-error-row" class="rec-error-row" style="display:none">
+            <div id="rec-error-msg" class="rec-error-msg"></div>
+            <button class="aibtn" onclick="retryTranscription()">Retry Transcription</button>
+          </div>
         </div>
         <div id="transcript-wrap" class="transcript-wrap" style="display:none">
           <label class="tlabel">Transcript</label>
@@ -358,6 +383,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
       <div class="secbody">
         <p style="font-size:13px;color:#888;margin-bottom:10px">Review and edit each section before generating the PDF.</p>
+        <button class="pbtn preview-cta" onclick="openPreview()">&#128196; Preview Report</button>
         <div class="editbar">
           <button id="edit-rec-btn" class="micbtn" onclick="toggleEditRec()" title="Voice edit">&#127897;</button>
           <input id="edit-text" type="text" placeholder="Type an edit instruction or tap mic...">
@@ -389,6 +415,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="pgrid" id="photo-grid"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="view" id="view-preview">
+  <div class="wrap">
+    <button class="preview-back" onclick="closePreview()">&larr; Back to form</button>
+    <div class="pgtitle" id="preview-title">Report Preview</div>
+    <div class="pgsub" style="margin-bottom:18px">Tap any section to edit. Changes save automatically.</div>
+    <div id="preview-content"></div>
+    <button class="pbtn" onclick="generate()" style="width:100%;font-size:15px;padding:13px;margin-top:8px">Generate PDF</button>
   </div>
 </div>
 
@@ -1146,17 +1182,11 @@ function toggleRec(){
       audioURL = URL.createObjectURL(audioBlob);
       document.getElementById('rec-audio').src = audioURL;
       document.getElementById('recplayback').style.display = 'block';
-      setPill('voice-status','Transcribing...','work');
-      whisperTranscribe(audioBlob).then(function(text){
-        var tEl = document.getElementById('transcript');
-        var existing = tEl.textContent || '';
-        tEl.textContent = existing ? (existing + '\n\n' + text) : text;
-        document.getElementById('transcript-wrap').style.display = 'block';
-        setPill('voice-status','Transcript captured - record more, retake, or generate','done');
-        saveJob();
-      }).catch(function(e){ setPill('voice-status','Transcription error: '+e.message,'err'); });
+      hideRecError();
+      runTranscription();
     };
     document.getElementById('recplayback').style.display = 'none';
+    hideRecError();
     mrec.start();
     document.getElementById('rec-btn').classList.add('recording');
     document.getElementById('rec-label').textContent = 'Stop';
@@ -1183,12 +1213,13 @@ function retakeRecording(){
   document.getElementById('recplayback').style.display = 'none';
   document.getElementById('transcript-wrap').style.display = 'none';
   document.getElementById('transcript').textContent = '';
+  hideRecError();
   setPill('voice-status','','');
   toggleRec();
 }
 
 function whisperTranscribe(blob){
-  if(!getOpenAIKey()) return Promise.reject(new Error('OpenAI key required'));
+  if(!getOpenAIKey()) return Promise.reject(new Error('No OpenAI key - add it in Settings'));
   var ext = 'webm';
   var t = (blob.type||'').toLowerCase();
   if(t.indexOf('mp4')>=0 || t.indexOf('aac')>=0) ext = 'm4a';
@@ -1199,16 +1230,73 @@ function whisperTranscribe(blob){
   fd.append('model', 'whisper-1');
   fd.append('language', 'en');
   fd.append('prompt', WHISPER_VOCAB);
+  var ctrl = new AbortController();
+  var to = setTimeout(function(){ ctrl.abort(); }, 60000);
   return fetch(WHISPER_API, {
     method:'POST',
     headers:{ 'Authorization': 'Bearer ' + getOpenAIKey() },
-    body: fd
+    body: fd,
+    signal: ctrl.signal
   }).then(function(r){
-    return r.json().then(function(data){
-      if(!r.ok) throw new Error((data.error && data.error.message) || 'Whisper error');
-      return data.text || '';
+    clearTimeout(to);
+    return r.text().then(function(raw){
+      var data = null; try { data = JSON.parse(raw); } catch(e){}
+      if(!r.ok){
+        var detail = (data && data.error && data.error.message) || (raw||'').slice(0,200) || ('HTTP '+r.status);
+        if(r.status === 401 || r.status === 403) throw new Error('OpenAI auth failed (HTTP '+r.status+') - check your API key in Settings');
+        if(r.status === 429) throw new Error('OpenAI rate limit hit - wait a moment and try again');
+        if(r.status >= 500) throw new Error('OpenAI service error (HTTP '+r.status+') - try again in a moment');
+        throw new Error('OpenAI error: ' + detail);
+      }
+      return (data && data.text) || '';
     });
+  }).catch(function(e){
+    clearTimeout(to);
+    if(e && e.name === 'AbortError') throw new Error('Transcription timed out after 60s - check your connection and try again');
+    var m = (e && e.message) || String(e);
+    if(m === 'Failed to fetch' || m === 'Load failed' || m.indexOf('NetworkError') >= 0)
+      throw new Error('Network error - check your internet connection and try again');
+    throw e;
   });
+}
+
+function showRecError(msg){
+  var row = document.getElementById('rec-error-row');
+  var el  = document.getElementById('rec-error-msg');
+  if(!row || !el) return;
+  el.textContent = msg;
+  row.style.display = 'block';
+}
+
+function hideRecError(){
+  var row = document.getElementById('rec-error-row');
+  if(row) row.style.display = 'none';
+}
+
+function runTranscription(){
+  if(!audioBlob){ showToast('No recording to transcribe'); return; }
+  setPill('voice-status','Transcribing...','work');
+  whisperTranscribe(audioBlob).then(function(text){
+    var tEl = document.getElementById('transcript');
+    var existing = tEl.textContent || '';
+    tEl.textContent = existing ? (existing + '\n\n' + text) : text;
+    document.getElementById('transcript-wrap').style.display = 'block';
+    hideRecError();
+    setPill('voice-status','Transcript captured - record more, retake, or generate','done');
+    saveJob();
+  }).catch(function(e){
+    var msg = (e && e.message) || 'Unknown error';
+    showRecError(msg);
+    setPill('voice-status','Transcription failed','err');
+    showToast(msg);
+  });
+}
+
+function retryTranscription(){
+  if(!audioBlob){ showToast('No recording to retry'); return; }
+  hideRecError();
+  setPill('voice-status','Retrying transcription...','work');
+  runTranscription();
 }
 
 function generateReportFromTranscript(){
@@ -1427,6 +1515,148 @@ function matchPhotos(findingsText, src){
     var ref = matched.length ? matched.map(function(m){ return '#'+m.num; }).join(', ') : (pts[2]||'').trim();
     return (pts[0]||'')+'|'+(pts[1]||'')+'|'+ref;
   }).join('\n');
+}
+
+/* ---- LIVE REPORT PREVIEW ---- */
+
+var previewEditingField = null;
+
+function escTA(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function openPreview(){
+  if(!g('ai-scope').trim()){ showToast('Generate report sections first'); return; }
+  previewEditingField = null;
+  renderPreview();
+  document.getElementById('preview-title').textContent = g('f-address') || g('f-client') || 'Report Preview';
+  goView('preview');
+}
+
+function closePreview(){
+  if(previewEditingField) savePreviewEdit();
+  goView('form');
+}
+
+function previewSections(){
+  var arr = [
+    { key:'ai-scope',      label:'Scope of Works',  type:'text' },
+    { key:'ai-findings',   label:'Findings',        type:'findings' }
+  ];
+  if(jtype === 'leak' && (g('ai-entry')||'').trim()){
+    arr.push({ key:'ai-entry', label:'Point of Water Entry', type:'text' });
+  }
+  arr.push({ key:'ai-causation', label:'Causation',         type:'text' });
+  arr.push({ key:'ai-maint',     label:'Maintenance',       type:'text' });
+  arr.push({ key:'ai-recs',      label:'Recommendations',   type:'recs' });
+  arr.push({ key:'ai-conclusion',label:'Conclusion',        type:'text' });
+  return arr;
+}
+
+function renderFindingsTable(text){
+  var lines = (text||'').split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  if(!lines.length) return '<div class="preview-body empty">(empty)</div>';
+  var rows = lines.map(function(line){
+    var pi = line.indexOf('|');
+    var area = pi >= 0 ? line.substring(0, pi).trim() : line;
+    var obs  = pi >= 0 ? line.substring(pi+1).trim() : '';
+    return '<tr><td class="preview-area">'+esc(area)+'</td><td>'+esc(obs)+'</td></tr>';
+  }).join('');
+  return '<table class="preview-table"><thead><tr><th style="width:30%">Area</th><th>Observation</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+function renderRecsTable(text){
+  if(!(text||'').trim()) return '<div class="preview-body empty">(empty)</div>';
+  var pri = { Immediate:'', Maintenance:'', Monitor:'' };
+  var cur = null;
+  text.split('\n').forEach(function(line){
+    var m = line.match(/^\s*(Immediate|Maintenance|Monitor)\s*:\s*(.*)$/i);
+    if(m){ cur = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase(); pri[cur] = m[2].trim(); }
+    else if(cur && line.trim()){ pri[cur] += (pri[cur]?' ':'') + line.trim(); }
+  });
+  var colors = { Immediate:'#cc0000', Maintenance:'#cc8800', Monitor:'#2e7d32' };
+  var rows = ['Immediate','Maintenance','Monitor'].map(function(p){
+    return '<tr><td class="preview-pri" style="color:'+colors[p]+'">'+p+'</td><td>'+esc(pri[p] || 'Nil')+'</td></tr>';
+  }).join('');
+  return '<table class="preview-table"><tbody>'+rows+'</tbody></table>';
+}
+
+function renderPreviewSection(sec){
+  var value = g(sec.key) || '';
+  var isEditing = previewEditingField === sec.key;
+  var html = '<div class="preview-section'+(isEditing?' editing':'')+'" data-field="'+sec.key+'"';
+  if(!isEditing) html += ' onclick="openPreviewEditor(\''+sec.key+'\')"';
+  html += '>';
+  html += '<div class="preview-heading">'+esc(sec.label)+'</div>';
+  if(isEditing){
+    html += '<textarea class="preview-editor" id="preview-editor-ta" oninput="autosizeEditor(this)">'+escTA(value)+'</textarea>';
+    html += '<div class="preview-editor-actions">';
+    html += '<button class="ghostbtn" onclick="event.stopPropagation();cancelPreviewEdit()">Cancel</button>';
+    html += '<button class="pbtn" onclick="event.stopPropagation();savePreviewEdit()">Save</button>';
+    html += '</div>';
+  } else if(sec.type === 'findings'){
+    html += renderFindingsTable(value);
+  } else if(sec.type === 'recs'){
+    html += renderRecsTable(value);
+  } else {
+    var body = value.trim() ? esc(value) : '(empty)';
+    html += '<div class="preview-body'+(value.trim()?'':' empty')+'">'+body+'</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderPreview(){
+  var host = document.getElementById('preview-content');
+  if(!host) return;
+  host.innerHTML = previewSections().map(renderPreviewSection).join('');
+}
+
+function autosizeEditor(el){
+  if(!el) return;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function handlePreviewOutsideClick(e){
+  var editor = document.querySelector('.preview-section.editing');
+  if(!editor) return;
+  if(editor.contains(e.target)) return;
+  savePreviewEdit();
+}
+
+function openPreviewEditor(field){
+  if(previewEditingField === field) return;
+  if(previewEditingField) savePreviewEdit();
+  previewEditingField = field;
+  renderPreview();
+  setTimeout(function(){
+    var ta = document.getElementById('preview-editor-ta');
+    if(ta){ autosizeEditor(ta); ta.focus(); }
+  }, 40);
+  setTimeout(function(){
+    document.addEventListener('click', handlePreviewOutsideClick, true);
+  }, 80);
+}
+
+function savePreviewEdit(){
+  var ta = document.getElementById('preview-editor-ta');
+  var field = previewEditingField;
+  previewEditingField = null;
+  document.removeEventListener('click', handlePreviewOutsideClick, true);
+  if(ta && field){
+    var newVal = ta.value;
+    if(g(field) !== newVal){
+      sv(field, newVal);
+      markEdited();
+      saveJob();
+    }
+  }
+  renderPreview();
+}
+
+function cancelPreviewEdit(){
+  previewEditingField = null;
+  document.removeEventListener('click', handlePreviewOutsideClick, true);
+  renderPreview();
 }
 
 function generate(){
