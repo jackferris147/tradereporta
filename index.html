@@ -840,7 +840,7 @@ function saveJobsStore(){
     if(photosLoaded){
       var i = jobs.findIndex(function(j){ return j.id===cid; });
       if(i>=0){
-        var arr = (jobs[i].photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||''}; });
+        var arr = (jobs[i].photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0}; });
         idbPut(cid, arr);
       }
     }
@@ -1110,7 +1110,7 @@ function openJob(id){
   idbGet(id).then(function(arr){
     if(cid !== openCid) return;
     var src = (arr && arr.length) ? arr : (j.photos||[]);
-    photos = src.map(function(p){ return {url:p.url||'', cap:p.cap||'', loading:false}; });
+    photos = src.map(function(p){ return {url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0, loading:false}; });
     renderPhotos();
     if((!arr || !arr.length) && j.photos && j.photos.length){
       idbPut(id, photos.map(function(p){ return {url:p.url||'', cap:p.cap||''}; }));
@@ -1800,7 +1800,10 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     for(var pj=0;pj<3;pj++){
       var ph = pdfPhotos[pi+pj];
       if(ph){
-        var phClass = ph.orientation === 'portrait' ? 'ph-cell ph-portrait' : 'ph-cell ph-landscape';
+        var ori = ph.orientation;
+        if(!ori && ph.width && ph.height){ ori = ph.width > ph.height ? 'landscape' : 'portrait'; }
+        if(!ori) ori = 'landscape';
+        var phClass = ori === 'portrait' ? 'ph-cell ph-portrait' : 'ph-cell ph-landscape';
         rowHtml += '<div class="'+phClass+'"><img src="'+ph.url+'"><div class="ph-cap">Photo '+(pi+pj+1)+(ph.cap?' - '+esc(ph.cap):'')+'</div></div>';
       } else {
         rowHtml += '<div class="ph-cell"></div>';
