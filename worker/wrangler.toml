@@ -3,9 +3,8 @@ main = "src/index.js"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Browser Rendering binding (requires Workers Paid plan)
-[browser]
-binding = "BROWSER"
-
-# PDF_SECRET is set as a runtime secret via `wrangler secret put PDF_SECRET`
-# Do NOT put the secret value in this file.
+# This worker calls Cloudflare's Browser Rendering REST API directly
+# (no @cloudflare/puppeteer binding). Required secrets:
+#   wrangler secret put PDF_SECRET
+#   wrangler secret put CF_ACCOUNT_ID
+#   wrangler secret put CF_API_TOKEN

@@ -1702,7 +1702,51 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 
 
 
+function compressPhotoForPDF(photoUrl){
+  return new Promise(function(resolve){
+    if(!photoUrl){ resolve(''); return; }
+    var img = new Image();
+    img.onload = function(){
+      var maxSide = 800;
+      var w = img.width, h = img.height;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      try {
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.35));
+      } catch(e){ resolve(photoUrl); }
+    };
+    img.onerror = function(){ resolve(photoUrl); };
+    img.src = photoUrl;
+  });
+}
+
 function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
+  var rawPdfPhotos = (photos||[]).filter(function(p){ return p && p.url; });
+  console.log('[pdf] compressing', rawPdfPhotos.length, 'photos for PDF...');
+  var t0 = Date.now();
+  Promise.all(rawPdfPhotos.map(function(p){
+    return compressPhotoForPDF(p.url).then(function(url){
+      var origSize = (p.url||'').length;
+      var newSize = (url||'').length;
+      return Object.assign({}, p, { url: url, _origSize: origSize, _newSize: newSize });
+    });
+  })).then(function(pdfPhotos){
+    var origTotal = pdfPhotos.reduce(function(s,p){ return s+(p._origSize||0); }, 0);
+    var newTotal  = pdfPhotos.reduce(function(s,p){ return s+(p._newSize||0); }, 0);
+    console.log('[pdf] photo compression done in', (Date.now()-t0), 'ms - original ~', Math.round(origTotal/1024), 'KB, compressed ~', Math.round(newTotal/1024), 'KB');
+    buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,pdfPhotos);
+  }).catch(function(e){
+    console.error('[pdf] photo compression failed:', e && e.message);
+    setPill('gen-status','Error preparing photos: '+(e && e.message || e),'err');
+    busy=false; document.getElementById('gen-btn').disabled=false;
+  });
+}
+
+function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,pdfPhotos){
   var localPhotos = (photos||[]).slice();
   var f = getJobData();
   var isLeak = f.type==='leak';
@@ -1792,7 +1836,6 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
     '</tr>';
   }).join('');
 
-  var pdfPhotos = localPhotos.filter(function(p){ return p && p.url; });
   var phRows = [];
   for(var pi=0;pi<pdfPhotos.length;pi+=3){
     var rowCls = 'ph-row'+(pi===0?' ph-first':'');
@@ -1972,6 +2015,8 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
   if(PDF_WORKER_URL && PDF_WORKER_SECRET){
     // PDF Worker flow: server-side render via Cloudflare Browser Rendering.
     setPill('gen-status','Rendering PDF...','work');
+    console.log('[pdf] HTML payload size:', html.length, 'chars (~', Math.round(html.length/1024), 'KB,', (html.length/1048576).toFixed(2), 'MB)');
+    var fetchT0 = Date.now();
     fetch(PDF_WORKER_URL + '/render', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'X-PDF-Secret':PDF_WORKER_SECRET },
@@ -1982,6 +2027,7 @@ function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
       return r.blob();
     })
     .then(function(blob){
+      console.log('[pdf] PDF received in', (Date.now()-fetchT0), 'ms - size:', blob.size, 'bytes (~', Math.round(blob.size/1024), 'KB,', (blob.size/1048576).toFixed(2), 'MB)');
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url; a.download = filename;
