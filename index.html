@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Trade Reporta</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FAFAFA;color:#111;font-size:14px;line-height:1.5}
@@ -172,11 +173,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .rec-error-row{margin-top:10px;padding:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px}
 .rec-error-msg{color:#cc0000;font-size:13px;line-height:1.5;margin-bottom:10px}
 .rec-error-row .aibtn{margin-top:0}
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:#FAFAFA}
+.auth-card{background:#fff;border:1px solid #EBEBEB;border-radius:12px;padding:28px 26px;width:100%;max-width:380px}
+.auth-logo{font-size:22px;font-weight:700;color:#111;text-align:center;margin-bottom:6px}
+.auth-logo span{color:#999;font-weight:400}
+.auth-tag{font-size:13px;color:#888;text-align:center;margin-bottom:20px}
+.auth-err{display:none;background:#FEF2F2;color:#DC2626;font-size:12px;padding:9px 12px;border-radius:6px;margin-bottom:14px;line-height:1.4}
+.auth-err.on{display:block}
+.auth-btns{display:flex;gap:8px;margin-top:14px}
+.auth-btns .pbtn,.auth-btns .sbtn{flex:1;padding:10px 14px;font-size:14px}
+.account-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.account-email{font-size:13px;color:#666;word-break:break-all;flex:1}
 </style>
 </head>
 <body>
 
-<header class="hdr">
+<header class="hdr" id="app-hdr" style="display:none">
   <div class="logo">Trade Reporta <span>by JFR</span></div>
   <div class="hdr-r">
     <button class="nbtn on" id="nav-jobs" onclick="goView('jobs')">Reports</button>
@@ -186,8 +198,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </header>
 <div class="toast" id="toast"></div>
 
+<!-- AUTH -->
+<div class="view on" id="view-auth">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">Trade Reporta <span>by JFR</span></div>
+      <div class="auth-tag">Sign in to access your reports</div>
+      <div class="auth-err" id="auth-err"></div>
+      <div class="fld" style="margin-bottom:10px"><label>Email</label><input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com"></div>
+      <div class="fld" style="margin-bottom:10px"><label>Password</label><input type="password" id="auth-pwd" autocomplete="current-password" placeholder="At least 6 characters"></div>
+      <div class="auth-btns">
+        <button type="button" class="sbtn" onclick="doSignup()">Sign up</button>
+        <button type="button" class="pbtn" onclick="doLogin()">Log in</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- JOBS -->
-<div class="view on" id="view-jobs">
+<div class="view" id="view-jobs">
   <div class="wrap">
     <div class="pgtitle">Reports</div>
     <div class="pgsub">All your inspection reports</div>
@@ -207,6 +236,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="wrap">
     <div class="pgtitle">Settings</div>
     <div class="pgsub">Configure your account</div>
+    <div class="card">
+      <div class="card-title">Account</div>
+      <div class="account-row">
+        <div class="account-email" id="account-email">Loading account...</div>
+        <button type="button" class="sbtn" onclick="doLogout()">Log out</button>
+      </div>
+    </div>
     <div class="card">
       <div class="card-title">Claude API Key</div>
       <div class="card-sub">Stored in your browser only. Powers all AI features.<br>Get yours at <strong>console.anthropic.com</strong> &rarr; API Keys &rarr; Create Key.</div>
@@ -471,6 +507,9 @@ var WHISPER_API = 'https://api.openai.com/v1/audio/transcriptions';
 // in-browser print-dialog flow. Fill these in after `wrangler deploy`.
 var PDF_WORKER_URL = 'https://tradereporta-pdf.jack-6c8.workers.dev';
 var PDF_WORKER_SECRET = '08f7a983dd653a0d10d6407348a7d11ed285fc5075110396c8cb825becb93fcd';   // matches the PDF_SECRET set on the Worker
+var SUPA_URL = 'https://tvkhsmxnhqkpgpkpllax.supabase.co';
+var SUPA_KEY = 'sb_publishable_8unqhQp-FFzkjd6Mjy4lPQ_i47Syanq';
+var supa = null;
 var WHISPER_VOCAB = 'Roofing inspection report. Terms include: ridge cap, valley flashing, barge capping, head capping, sarking, battens, fascia, eaves, downpipe, box gutter, colorbond, decramastic, terracotta, mortar, repointing, silicone, flashing, membrane, skylights, penetrations, leaf guard';
 var REPORT_SYSTEM_PROMPT = "You are a professional report writer for JFR Roofing, a Gold Coast based roofing specialist.\n\nWrite as an experienced Australian roofing tradesman explaining findings to an insurance assessor or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.\n\nSTRICT RULES:\n- Keep the report concise and professional. A good report is complete but not padded. Aim for clarity over length.\n- The report must read smoothly and professionally from start to finish. Read each section back as if you are the inspector. If a sentence feels clunky, awkward or overly technical rewrite it. Every sentence should flow naturally.\n- Never add bracketed explanations after technical terms. Use the correct technical term only. Do not write 'Trimdeck sheeting (ribbed metal roof sheeting)' - just write 'Trimdeck sheeting'.\n- Each section must contain ONLY information relevant to that section\n- Never repeat the same information within a section\n- Repetition across sections is expected and fine - findings will naturally appear in causation and maintenance\n- Use judgement on detail. Not every finding needs the same level of explanation. A minor item needs one clear sentence. A significant defect related to the claim needs more context. Write what is needed to clearly communicate - no more, no less.\n- Findings: Group related findings together under one row. Do not create separate rows for different aspects of the same component.\nExamples of correct grouping:\n- Air con penetration + Deckite flashing around it = ONE row\n- Skylight + Deckite flashing + fixings = ONE row\n- Rusted fixings + loose fixings + general fixing condition = ONE row\n- Multiple penetrations in similar condition = ONE row\nOnly create separate rows when findings are genuinely distinct defects in different locations, or when hail damage is involved (hail damage always gets its own row as it is a primary insurance claim item), or when you specifically call something out as a major or serious issue.\nKeep each finding to one clear sentence describing what was found and where. Only add severity or context when it is significant or directly relevant to the claim.\nThe Area column should clearly identify the component - for example 'Ridge Cap', 'Box Gutter', 'Air Con Penetration', 'Trimdeck Sheeting'. Only include location (North, Rear, East etc) when it is relevant or when there are multiple of the same component in different locations. Keep area headings clean and simple.\n- Causation: why the issues happened, reference findings by area rather than repeating them word for word\n- Maintenance: List maintenance issues found during the inspection as clear dot points, one issue per dot point. For each item state what was found and where. Only mention how long it has been present when it is clearly relevant - for example when it relates to an insurance claim timeline or when the duration is obvious from the condition. Do not make judgements about whether the owner would or would not have been aware. Do not include recommendations here - only describe what was found. If no maintenance issues were found write exactly: No maintenance issues were identified during the inspection.\n- Recommendations: each priority row should be 1-2 sentences describing specific work and its purpose. Do not repeat causation\n- Conclusion: brief summary only, one paragraph, no new information\n\nOUTPUT FORMAT - respond with exactly these tags, no other text:\n[SCOPE] one or two sentences starting with 'As requested, JFR Roofing attended site to...'\n[FINDINGS] one finding per line in format: Area | Observation. Group related issues under one row. Keep observations concise - one clear sentence unless additional detail is genuinely needed.\n[CAUSATION] two paragraphs maximum starting with 'Based on our inspection, it is the opinion of JFR Roofing that...'\n[MAINTENANCE] clear dot points describing each maintenance issue found - what was found and where, plus duration only when clearly relevant; or the sentence 'No maintenance issues were identified during the inspection'\n[RECOMMENDATIONS]\nImmediate: 1-2 sentences describing urgent action and its purpose (e.g. 'All hail-damaged broken tiles should be identified and replaced across the full roof surface to stop ongoing water entry.'), or Nil\nMaintenance: 1-2 sentences describing planned maintenance work (e.g. 'Valley clips should be installed on the small valley tiles during the tile replacement works. Gutters to be cleared at the same time.'), or Nil\nMonitor: 1-2 sentences describing what to monitor after repairs (e.g. 'Once repairs are completed, internal ceiling areas should be monitored for any further signs of moisture to confirm the source has been fully resolved.'), or Nil\n[CONCLUSION] one paragraph starting with 'JFR Roofing has...'";
 var EDIT_SYSTEM_PROMPT = "You are editing a roofing inspection report. You will receive the current report sections and an edit instruction. Make only the specific change requested. Do not change anything else. Return ALL sections in the original tag format even if unchanged.";
@@ -770,10 +809,16 @@ window.addEventListener('load', function(){
     readPhotosOrdered(Array.from(e.dataTransfer.files).filter(function(f){ return f.type.startsWith('image/'); }));
   });
   openIDB().then(function(){
-    var openId = sessionStorage.getItem('tr_open_id');
-    if(openId && jobs.find(function(x){ return x.id===openId; })){
-      openJob(openId);
+    if(!initSupa()){
+      showAuthErr('Could not load Supabase. Check your connection and reload.');
+      return;
     }
+    supa.auth.getSession().then(function(res){
+      if(res && res.data && res.data.session){
+        onLoggedIn();
+      }
+      // else: stay on #view-auth (initial state)
+    });
   });
 });
 
@@ -781,6 +826,8 @@ function goView(v){
   document.querySelectorAll('.view').forEach(function(el){ el.classList.remove('on'); });
   document.getElementById('view-'+v).classList.add('on');
   document.getElementById('gen-bar').style.display = v==='form'?'flex':'none';
+  var hdr = document.getElementById('app-hdr');
+  if(hdr) hdr.style.display = v==='auth' ? 'none' : 'flex';
   ['jobs','settings'].forEach(function(n){ document.getElementById('nav-'+n).classList.toggle('on', n===v); });
   if(v==='jobs'){ sessionStorage.removeItem('tr_open_id'); renderJobs(); }
   window.scrollTo(0,0);
@@ -832,7 +879,195 @@ function saveOpenAIKey(){
   showToast('OpenAI key saved');
 }
 
-function saveJobsStore(){
+function initSupa(){
+  if(window.supabase && !supa){
+    supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    supa.auth.onAuthStateChange(function(event){
+      if(event === 'SIGNED_OUT') clearLocalSessionState();
+    });
+  }
+  return !!supa;
+}
+
+function showAuthErr(msg){
+  var el = document.getElementById('auth-err');
+  if(!el) return;
+  el.textContent = msg;
+  el.classList.add('on');
+}
+function clearAuthErr(){
+  var el = document.getElementById('auth-err');
+  if(el) el.classList.remove('on');
+}
+
+function doLogin(){
+  var email = (g('auth-email')||'').trim();
+  var pwd = g('auth-pwd');
+  if(!email || !pwd){ showAuthErr('Email and password required'); return; }
+  if(!supa){ showAuthErr('Auth not ready - reload the page'); return; }
+  clearAuthErr();
+  supa.auth.signInWithPassword({email:email, password:pwd}).then(function(res){
+    if(res.error){ showAuthErr(res.error.message); return; }
+    onLoggedIn();
+  });
+}
+
+function doSignup(){
+  var email = (g('auth-email')||'').trim();
+  var pwd = g('auth-pwd');
+  if(!email || !pwd){ showAuthErr('Email and password required'); return; }
+  if(pwd.length < 6){ showAuthErr('Password must be at least 6 characters'); return; }
+  if(!supa){ showAuthErr('Auth not ready - reload the page'); return; }
+  clearAuthErr();
+  supa.auth.signUp({email:email, password:pwd}).then(function(res){
+    if(res.error){ showAuthErr(res.error.message); return; }
+    if(res.data && res.data.session){
+      onLoggedIn();
+    } else {
+      showAuthErr('Check your email to confirm your account, then log in.');
+    }
+  });
+}
+
+function doLogout(){
+  if(!supa){ return; }
+  supa.auth.signOut().then(function(){
+    // onAuthStateChange listener will also fire SIGNED_OUT and clear state
+    clearLocalSessionState();
+  });
+}
+
+function clearLocalSessionState(){
+  jobs = [];
+  photos = [];
+  cid = null;
+  photosLoaded = false;
+  sessionStorage.removeItem('tr_open_id');
+  try { localStorage.removeItem('tr_jobs'); } catch(e){}
+  try { localStorage.removeItem('tr_migrated'); } catch(e){}
+  sv('auth-email',''); sv('auth-pwd','');
+  clearAuthErr();
+  goView('auth');
+}
+
+function onLoggedIn(){
+  clearAuthErr();
+  sv('auth-pwd','');
+  if(!supa) return;
+  supa.auth.getSession().then(function(res){
+    var session = res && res.data && res.data.session;
+    if(session){
+      var el = document.getElementById('account-email');
+      if(el) el.textContent = session.user.email || '';
+    }
+    var doneMigration = (function(){
+      try { return localStorage.getItem('tr_migrated') === 'true'; } catch(e){ return false; }
+    })();
+    var migration = doneMigration ? Promise.resolve() : migrateLocalToCloud();
+    migration.then(loadJobsFromSupa).then(function(){
+      goView('jobs');
+      var openId = sessionStorage.getItem('tr_open_id');
+      if(openId && jobs.find(function(x){ return x.id===openId; })){
+        openJob(openId);
+      }
+    });
+  });
+}
+
+function jobToSupaRow(j){
+  var data = {};
+  for(var k in j){
+    if(j.hasOwnProperty(k) && k!=='id' && k!=='photos') data[k] = j[k];
+  }
+  data.photoCount = (j.photos||[]).length;
+  return {
+    id: j.id,
+    data: data,
+    updated_at: new Date(j.updatedAt || Date.now()).toISOString()
+  };
+}
+
+function supaRowToJob(row){
+  var d = (row && row.data) ? row.data : {};
+  var j = {};
+  for(var k in d){ if(d.hasOwnProperty(k)) j[k] = d[k]; }
+  j.id = row.id;
+  if(!j.photos) j.photos = [];
+  // updatedAt is stored in data (ms epoch). Fall back to column if missing.
+  if(j.updatedAt == null && row.updated_at){
+    j.updatedAt = Date.parse(row.updated_at) || 0;
+  }
+  return j;
+}
+
+function loadJobsFromSupa(){
+  if(!supa){ jobs = []; return Promise.resolve(); }
+  return supa.from('jobs').select('id,data,updated_at').order('updated_at',{ascending:false})
+    .then(function(res){
+      if(res.error){
+        console.log('Load jobs failed:', res.error.message);
+        showToast('Could not load reports from cloud');
+        // Keep whatever is currently in `jobs` (localStorage cache) as fallback
+        return;
+      }
+      jobs = (res.data||[]).map(supaRowToJob);
+    })
+    .catch(function(e){ console.log('Load jobs failed:', e && e.message); });
+}
+
+function migrateLocalToCloud(){
+  // One-shot: for each local job, push to cloud if cloud doesn't have it
+  // or local's updatedAt is newer than cloud's updated_at.
+  if(!supa) return Promise.resolve();
+  var localJobs = jobs.slice();
+  if(!localJobs.length){
+    try { localStorage.setItem('tr_migrated','true'); } catch(e){}
+    return Promise.resolve();
+  }
+  return supa.from('jobs').select('id,updated_at').then(function(res){
+    if(res.error){
+      console.log('Migration check failed:', res.error.message);
+      // Don't set the flag — let migration try again next login
+      return;
+    }
+    var cloudMap = {};
+    (res.data||[]).forEach(function(r){
+      cloudMap[r.id] = Date.parse(r.updated_at) || 0;
+    });
+    var toUpsert = localJobs.filter(function(j){
+      if(!j || !j.id) return false;
+      var localTs = j.updatedAt || 0;
+      var cloudTs = cloudMap[j.id];
+      if(cloudTs == null) return true; // not in cloud yet
+      return localTs > cloudTs; // local is newer
+    }).map(jobToSupaRow);
+    if(!toUpsert.length){
+      try { localStorage.setItem('tr_migrated','true'); } catch(e){}
+      showToast('Cloud sync ready');
+      return;
+    }
+    return supa.from('jobs').upsert(toUpsert).then(function(up){
+      if(up.error){
+        console.log('Migration upsert failed:', up.error.message);
+        showToast('Migration partial - some reports not synced');
+        return;
+      }
+      try { localStorage.setItem('tr_migrated','true'); } catch(e){}
+      showToast('Synced '+toUpsert.length+' report'+(toUpsert.length===1?'':'s')+' to cloud');
+    });
+  });
+}
+
+function cloudUpsertJob(id){
+  if(!supa || !id) return;
+  var i = jobs.findIndex(function(j){ return j.id===id; });
+  if(i<0) return;
+  supa.from('jobs').upsert(jobToSupaRow(jobs[i])).then(function(res){
+    if(res.error){ console.log('Supabase save failed:', res.error.message); showToast('Cloud sync failed - saved locally'); }
+  });
+}
+
+function saveJobsStore(syncId){
   try {
     var textOnly = jobs.map(function(j){
       var c = {};
@@ -845,13 +1080,14 @@ function saveJobsStore(){
   if(cid){
     sessionStorage.setItem('tr_open_id', cid);
     if(photosLoaded){
-      var i = jobs.findIndex(function(j){ return j.id===cid; });
-      if(i>=0){
-        var arr = (jobs[i].photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0}; });
+      var idx = jobs.findIndex(function(j){ return j.id===cid; });
+      if(idx>=0){
+        var arr = (jobs[idx].photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0}; });
         idbPut(cid, arr);
       }
     }
   }
+  cloudUpsertJob(syncId || cid);
 }
 
 function saveDraftBtn(){
@@ -899,6 +1135,11 @@ function deleteJob(id){
   jobs = jobs.filter(function(j){ return j.id !== id; });
   saveJobsStore();
   idbDelete(id);
+  if(supa){
+    supa.from('jobs').delete().eq('id', id).then(function(res){
+      if(res.error) console.log('Supabase delete failed:', res.error.message);
+    });
+  }
   if(cid === id){ cid = null; sessionStorage.removeItem('tr_open_id'); goView('jobs'); }
   else { renderJobs(); }
   showToast('Report deleted');
@@ -983,7 +1224,7 @@ function reopenJob(id){
   if(i < 0) return;
   jobs[i].status = 'inprogress';
   jobs[i].updatedAt = Date.now();
-  saveJobsStore();
+  saveJobsStore(id);
   openJob(id);
 }
 
