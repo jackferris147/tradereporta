@@ -10,20 +10,20 @@
 const ALLOWED_ORIGINS = [
   "https://tradereporta.com.au",
   "https://www.tradereporta.com.au",
-  "https://jackferris147.github.io",
   "http://localhost:8080",
   "http://127.0.0.1:8080",
 ];
 
 function corsHeaders(origin) {
-  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allow,
+  const isAllowed = ALLOWED_ORIGINS.includes(origin);
+  const headers = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-PDF-Secret",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
+  if (isAllowed) headers["Access-Control-Allow-Origin"] = origin;
+  return headers;
 }
 
 function safeFilename(name) {
