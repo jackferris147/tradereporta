@@ -987,6 +987,8 @@ function clearLocalSessionState(){
 function onLoggedIn(){
   clearAuthErr();
   sv('auth-pwd','');
+  // Wipe legacy client-side API keys from pre-proxy era (idempotent — no-op if absent)
+  try { localStorage.removeItem('tr_key'); localStorage.removeItem('tr_openai_key'); } catch(e){}
   if(!supa) return;
   supa.auth.getSession().then(function(res){
     var session = res && res.data && res.data.session;
