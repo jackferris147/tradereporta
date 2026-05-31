@@ -1,29 +1,44 @@
-// Trade Reporta — PDF Worker
-// Renders inspection-report HTML to PDF via the Cloudflare Browser Rendering REST API.
-// (Switched from @cloudflare/puppeteer because the WebSocket-based binding kept hanging.)
+// Trade Reporta — Worker
+// Routes:
+//   POST /api/ai         — Anthropic Claude proxy (Supabase-authed)
+//   POST /api/transcribe — OpenAI Whisper proxy (Supabase-authed)
+//   POST /* (default)    — Browser Rendering PDF (PDF_SECRET-authed)
 //
 // Required secrets (set with `wrangler secret put`):
-//   PDF_SECRET       — shared secret between app and worker (X-PDF-Secret header)
-//   CF_ACCOUNT_ID    — Cloudflare account ID (32-char hex)
-//   CF_API_TOKEN     — API token with "Browser Rendering — Edit" permission
+//   PDF_SECRET        — shared secret between app and worker (X-PDF-Secret header)
+//   CF_ACCOUNT_ID     — Cloudflare account ID
+//   CF_API_TOKEN      — API token with "Browser Rendering — Edit" permission
+//   ANTHROPIC_KEY     — Anthropic API key for /api/ai
+//   OPENAI_KEY        — OpenAI API key for /api/transcribe
+//   SUPABASE_URL      — Supabase project URL for session verification
+//   SUPABASE_ANON_KEY — Supabase publishable/anon key for /auth/v1/user lookup
 
 const ALLOWED_ORIGINS = [
   "https://tradereporta.com.au",
   "https://www.tradereporta.com.au",
   "http://localhost:8080",
+  "http://localhost:8765",
   "http://127.0.0.1:8080",
+  "http://127.0.0.1:8765",
 ];
 
 function corsHeaders(origin) {
   const isAllowed = ALLOWED_ORIGINS.includes(origin);
   const headers = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-PDF-Secret",
+    "Access-Control-Allow-Headers": "Content-Type, X-PDF-Secret, Authorization",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
   if (isAllowed) headers["Access-Control-Allow-Origin"] = origin;
   return headers;
+}
+
+function jsonError(status, message, origin) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders(origin) }
+  });
 }
 
 function safeFilename(name) {
@@ -34,13 +49,115 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
     const baseHeaders = corsHeaders(origin);
+    const url = new URL(request.url);
     const reqId = (crypto.randomUUID && crypto.randomUUID().slice(0, 8)) || String(Date.now());
 
-    console.log(`[${reqId}] ${request.method} ${request.url} origin="${origin}"`);
+    console.log(`[${reqId}] ${request.method} ${url.pathname} origin="${origin}"`);
 
+    // CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: baseHeaders });
     }
+
+    // /api/* routes — Supabase-authed AI proxy
+    if (url.pathname.startsWith("/api/")) {
+      // Origin enforcement: stops anyone using the Worker URL directly from outside the app
+      if (!ALLOWED_ORIGINS.includes(origin)) {
+        console.warn(`[${reqId}] /api/* rejected: origin "${origin}" not in allowlist`);
+        return jsonError(403, "Forbidden origin", origin);
+      }
+
+      // Supabase session verification
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+        console.error(`[${reqId}] SUPABASE_URL or SUPABASE_ANON_KEY missing`);
+        return jsonError(500, "Server not configured", origin);
+      }
+      const token = (request.headers.get("Authorization") || "").replace("Bearer ", "").trim();
+      if (!token) {
+        return jsonError(401, "Unauthorized", origin);
+      }
+      let verify;
+      try {
+        verify = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+          headers: { "Authorization": `Bearer ${token}`, "apikey": env.SUPABASE_ANON_KEY }
+        });
+      } catch (e) {
+        console.error(`[${reqId}] Supabase verify fetch threw: ${e && e.message}`);
+        return jsonError(502, "Auth check failed", origin);
+      }
+      if (!verify.ok) {
+        console.warn(`[${reqId}] Supabase verify failed status=${verify.status}`);
+        return jsonError(401, "Unauthorized", origin);
+      }
+
+      // /api/ai — Anthropic Claude proxy
+      if (url.pathname === "/api/ai" && request.method === "POST") {
+        if (!env.ANTHROPIC_KEY) {
+          console.error(`[${reqId}] ANTHROPIC_KEY missing`);
+          return jsonError(500, "AI not configured", origin);
+        }
+        let body;
+        try {
+          body = await request.json();
+        } catch (e) {
+          return jsonError(400, "Invalid JSON", origin);
+        }
+        let upstream;
+        try {
+          upstream = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": env.ANTHROPIC_KEY,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify(body),
+          });
+        } catch (e) {
+          console.error(`[${reqId}] /api/ai upstream threw: ${e && e.message}`);
+          return jsonError(502, "AI upstream error", origin);
+        }
+        const data = await upstream.json();
+        return new Response(JSON.stringify(data), {
+          status: upstream.status,
+          headers: { "Content-Type": "application/json", ...baseHeaders }
+        });
+      }
+
+      // /api/transcribe — OpenAI Whisper proxy
+      if (url.pathname === "/api/transcribe" && request.method === "POST") {
+        if (!env.OPENAI_KEY) {
+          console.error(`[${reqId}] OPENAI_KEY missing`);
+          return jsonError(500, "Transcription not configured", origin);
+        }
+        let formData;
+        try {
+          formData = await request.formData();
+        } catch (e) {
+          return jsonError(400, "Invalid form data", origin);
+        }
+        let upstream;
+        try {
+          upstream = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${env.OPENAI_KEY}` },
+            body: formData,
+          });
+        } catch (e) {
+          console.error(`[${reqId}] /api/transcribe upstream threw: ${e && e.message}`);
+          return jsonError(502, "Transcription upstream error", origin);
+        }
+        const data = await upstream.json();
+        return new Response(JSON.stringify(data), {
+          status: upstream.status,
+          headers: { "Content-Type": "application/json", ...baseHeaders }
+        });
+      }
+
+      return jsonError(404, "Not found", origin);
+    }
+
+    // === Existing PDF route (PDF_SECRET-authed) ===
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405, headers: baseHeaders });
     }

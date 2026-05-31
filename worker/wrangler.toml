@@ -3,8 +3,15 @@ main = "src/index.js"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# This worker calls Cloudflare's Browser Rendering REST API directly
-# (no @cloudflare/puppeteer binding). Required secrets:
-#   wrangler secret put PDF_SECRET
-#   wrangler secret put CF_ACCOUNT_ID
-#   wrangler secret put CF_API_TOKEN
+# Required secrets (set with `wrangler secret put`, never commit real values):
+#   wrangler secret put PDF_SECRET         — shared X-PDF-Secret header value (PDF route auth)
+#   wrangler secret put CF_ACCOUNT_ID      — Cloudflare account ID
+#   wrangler secret put CF_API_TOKEN       — Cloudflare API token with "Browser Rendering — Edit" scope
+#   wrangler secret put ANTHROPIC_KEY      — Anthropic API key for /api/ai proxy
+#   wrangler secret put OPENAI_KEY         — OpenAI API key for /api/transcribe proxy
+#   wrangler secret put SUPABASE_URL       — Supabase project URL for session verification
+#   wrangler secret put SUPABASE_ANON_KEY  — Supabase publishable key for /auth/v1/user lookup
+#
+# Do NOT add a [vars] block for any of the above — wrangler.toml [vars] can shadow secrets
+# of the same name at deploy time, leaving the runtime value as the empty/placeholder var.
+# The secret store is the sole source of truth for sensitive config.
