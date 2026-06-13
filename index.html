@@ -907,11 +907,11 @@ async function finaliseInvoice(){
   try {
     var r = await fetch(url, {
       method: 'POST',
-      // text/plain keeps this a CORS "simple request" so the browser does NOT
-      // send a preflight OPTIONS call — that empty preflight was the phantom
-      // second webhook trigger. Make.com parses the JSON body regardless.
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-      body: JSON.stringify(payload)
+      // x-www-form-urlencoded is a CORS "simple" content type, so the browser
+      // sends NO preflight OPTIONS request (no phantom empty call). Make.com
+      // parses the body into flat top-level fields (no "value" wrapper).
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: new URLSearchParams(payload).toString()
     });
     if(!r.ok) throw new Error('HTTP ' + r.status);
     j.invoiced = true;
