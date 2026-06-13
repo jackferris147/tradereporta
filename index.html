@@ -139,6 +139,11 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .genbar .pbtn:hover{background:#D4682E;color:#FFFFFF}
 .genbar .pbtn:disabled,.genbar .pbtn:disabled:hover{background:#E5E7EB;color:#9CA3AF;cursor:not-allowed}
 .genbar .sbtn{flex:1;font-size:13px;padding:10px}
+.form-actions{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.form-actions .pbtn{width:100%;padding:14px;font-size:15px}
+.form-actions .sbtn{width:100%;padding:12px;font-size:14px}
+.jcard-action{display:flex;gap:8px;margin-top:10px}
+.jcard-action .jcard-reopen{margin-top:0}
 #finalise-btn.finalise-muted{font-size:11px;padding:9px 12px;white-space:normal;line-height:1.2}
 .binvoiced{background:#F0FDF4;border-color:rgba(22,163,74,0.2);color:#16A34A}
 .worow{display:flex;gap:10px;align-items:flex-start}
@@ -535,6 +540,11 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
         <div class="pgrid" id="photo-grid"></div>
       </div>
     </div>
+
+    <div class="form-actions">
+      <button type="button" class="pbtn" id="gen-btn" onclick="generate()">Generate PDF</button>
+      <button type="button" class="sbtn" id="export-btn" onclick="exportJobPack()" style="display:none">Export Pack</button>
+    </div>
   </div>
 </div>
 
@@ -554,11 +564,6 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
   <div class="genbar-secondary">
     <button type="button" class="sbtn" id="save-btn" onclick="saveDraftBtn()">Save</button>
     <button type="button" class="sbtn" id="complete-btn" onclick="markComplete()">Mark Complete</button>
-    <button type="button" class="sbtn" id="export-btn" onclick="exportJobPack()" style="display:none">Export Pack</button>
-  </div>
-  <div class="genbar-primary">
-    <button type="button" class="pbtn" id="gen-btn" onclick="generate()">Generate PDF</button>
-    <button type="button" class="pbtn" id="finalise-btn" onclick="finaliseInvoice()" style="display:none">Finalise &amp; Invoice</button>
   </div>
 </div>
 
@@ -1020,7 +1025,7 @@ function goView(v){
   document.querySelectorAll('.view').forEach(function(el){ el.classList.remove('on'); });
   document.getElementById('view-'+v).classList.add('on');
   document.getElementById('gen-bar').style.display = v==='form'?'flex':'none';
-  if(v==='form') updateFinaliseBtn();
+  if(v==='form'){ updateFinaliseBtn(); updateCompleteBtn(); }
   var hdr = document.getElementById('app-hdr');
   if(hdr) hdr.style.display = v==='auth' ? 'none' : 'flex';
   ['jobs','settings'].forEach(function(n){ document.getElementById('nav-'+n).classList.toggle('on', n===v); });
@@ -1299,7 +1304,8 @@ function getJobData(){
     aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion'),
     updatedAt: Date.now(),
     pdfGenerated: existing ? !!existing.pdfGenerated : false,
-    completedAt: existing ? existing.completedAt : undefined
+    completedAt: existing ? existing.completedAt : undefined,
+    invoiced: existing ? !!existing.invoiced : false
   };
 }
 
@@ -1390,9 +1396,11 @@ function markPdfGenerated(){
 
 function markComplete(){
   if(!cid){ showToast('No job open'); return; }
+  var existing = jobs.find(function(j){ return j.id === cid; });
   var d = getJobData();
   d.status = 'completed';
   d.completedAt = Date.now();
+  if(existing && existing.invoiced) d.invoiced = true;
   var i = jobs.findIndex(function(j){ return j.id === cid; });
   if(i >= 0) jobs[i] = d; else jobs.push(d);
   saveJobsStore();
@@ -1400,6 +1408,24 @@ function markComplete(){
   cid = null;
   sessionStorage.removeItem('tr_open_id');
   goView('jobs');
+}
+
+function updateCompleteBtn(){
+  var btn = document.getElementById('complete-btn');
+  if(!btn) return;
+  var j = cid && jobs.find(function(x){ return x.id === cid; });
+  if(j && j.status === 'completed'){
+    btn.textContent = 'Reopen';
+    btn.onclick = function(){ reopenJobCurrent(); };
+  } else {
+    btn.textContent = 'Mark Complete';
+    btn.onclick = function(){ markComplete(); };
+  }
+}
+
+function reopenJobCurrent(){
+  if(!cid) return;
+  reopenJob(cid);
 }
 
 function reopenJob(id){
@@ -1438,8 +1464,16 @@ function renderJobCard(j, sectionKey){
     var pct = jobProgress(j);
     html += '<div class="jprogress"><div class="jprogress-bar" style="width:'+pct+'%"></div></div>';
   }
+  if(sectionKey === 'awaiting'){
+    html += '<div class="jcard-action">';
+    html += '<button class="jcard-reopen" onclick="event.stopPropagation();finaliseInvoiceQuick(\''+j.id+'\')">Finalise &amp; Invoice</button>';
+    html += '</div>';
+  }
   if(sectionKey === 'completed'){
+    html += '<div class="jcard-action">';
+    html += '<button class="jcard-reopen" onclick="event.stopPropagation();exportJobPackFor(\''+j.id+'\')">Export Pack</button>';
     html += '<button class="jcard-reopen" onclick="event.stopPropagation();reopenJob(\''+j.id+'\')">Reopen</button>';
+    html += '</div>';
   }
   html += '</div>';
   return html;
@@ -2161,21 +2195,18 @@ function compressPhotoForExport(dataUrl){
   });
 }
 
-function exportJobPack(){
-  if(typeof JSZip === 'undefined'){ showToast('Zip library still loading'); return; }
-  var validPhotos = (photos||[]).filter(function(p){ return p && p.url; });
-  if(!validPhotos.length){ showToast('Add photos before exporting'); return; }
-  var btn = document.getElementById('export-btn');
-  var origLabel = btn ? btn.textContent : 'Export Pack';
-  if(btn){ btn.disabled = true; btn.textContent = 'Preparing...'; }
+function runExportPack(opts){
+  if(typeof JSZip === 'undefined'){ showToast('Zip library still loading'); return Promise.resolve(); }
+  var validPhotos = (opts.photos||[]).filter(function(p){ return p && p.url; });
+  if(!validPhotos.length){ showToast('No photos to export'); return Promise.resolve(); }
   showToast('Compressing photos...');
-  var client = sanitizeFileSegment(g('f-client')) || 'Job';
-  var address = sanitizeFileSegment(g('f-address')) || 'Untitled';
+  var client = sanitizeFileSegment(opts.client) || 'Job';
+  var address = sanitizeFileSegment(opts.address) || 'Untitled';
   var zipName = client + ' — ' + address + '.zip';
-  var includesPdf = pdfBlobCache.jobId === cid && pdfBlobCache.blob;
+  var hasPdf = !!opts.pdfBlob;
   var zip = new JSZip();
   var photosFolder = zip.folder('Photos');
-  Promise.all(validPhotos.map(function(p, i){
+  return Promise.all(validPhotos.map(function(p, i){
     return compressPhotoForExport(p.url).then(function(blob){
       var seq = String(i+1);
       if(seq.length < 2) seq = '0' + seq;
@@ -2188,7 +2219,7 @@ function exportJobPack(){
       console.error('[export] photo', i+1, 'failed:', e && e.message);
     });
   })).then(function(){
-    if(includesPdf) zip.file('Report.pdf', pdfBlobCache.blob);
+    if(hasPdf) zip.file('Report.pdf', opts.pdfBlob);
     return zip.generateAsync({ type: 'blob' });
   }).then(function(zipBlob){
     var url = URL.createObjectURL(zipBlob);
@@ -2196,14 +2227,82 @@ function exportJobPack(){
     a.href = url; a.download = zipName;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
-    if(includesPdf) showToast('Job pack ready — check Downloads');
+    if(hasPdf) showToast('Job pack ready — check Downloads');
     else showToast('Photos exported — generate PDF first to include it');
   }).catch(function(e){
     console.error('[export] zip failed:', e && e.message);
     showToast('Export failed — try again');
+  });
+}
+
+function exportJobPack(){
+  var validPhotos = (photos||[]).filter(function(p){ return p && p.url; });
+  if(!validPhotos.length){ showToast('Add photos before exporting'); return; }
+  var btn = document.getElementById('export-btn');
+  var origLabel = btn ? btn.textContent : 'Export Pack';
+  if(btn){ btn.disabled = true; btn.textContent = 'Preparing...'; }
+  runExportPack({
+    client: g('f-client'),
+    address: g('f-address'),
+    photos: photos,
+    pdfBlob: (pdfBlobCache.jobId === cid ? pdfBlobCache.blob : null)
   }).then(function(){
     if(btn){ btn.disabled = false; btn.textContent = origLabel; }
   });
+}
+
+function exportJobPackFor(jobId){
+  var j = jobs.find(function(x){ return x.id === jobId; });
+  if(!j){ showToast('Job not found'); return; }
+  showToast('Loading photos...');
+  idbGet(jobId).then(function(arr){
+    var src = (arr && arr.length) ? arr : (j.photos || []);
+    return runExportPack({
+      client: j.client,
+      address: j.address,
+      photos: src,
+      pdfBlob: (pdfBlobCache.jobId === jobId ? pdfBlobCache.blob : null)
+    });
+  });
+}
+
+async function finaliseInvoiceQuick(id){
+  if(invoiceInFlight) return;
+  var j = jobs.find(function(x){ return x.id === id; });
+  if(!j){ showToast('Job not found'); return; }
+  if(j.invoiced){ showToast('Already invoiced'); return; }
+  var url = getWebhookUrl();
+  if(!url){ showToast('Set webhook in Settings to enable invoicing'); return; }
+  var payload = {
+    po_number: (j.ref || '').trim(),
+    address: (j.address || '').trim(),
+    client: (j.client || '').trim(),
+    date: invoiceDate()
+  };
+  var missing = ['po_number','address','client','date'].filter(function(k){ return !payload[k]; });
+  if(missing.length){
+    showToast('Missing ' + missing.join(', ') + ' — open the job and complete it first');
+    return;
+  }
+  invoiceInFlight = true;
+  showToast('Sending invoice...');
+  try {
+    var r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: new URLSearchParams(payload).toString()
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    j.invoiced = true;
+    j.updatedAt = Date.now();
+    saveJobsStore();
+    showToast('Invoice sent ✓');
+    renderJobs();
+  } catch(e){
+    showToast('Invoice failed — try again');
+  } finally {
+    invoiceInFlight = false;
+  }
 }
 
 function generate(){
