@@ -6,10 +6,10 @@
 <title>Trade Reporta</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--orange:#E8763A;--charcoal:#1C1A18;--surface:#FFFFFF;--offwhite:#1C1A18;--muted:#7A7570;--deep:#F2F0EC;--ink:#1C1A18;--border:#E2DDD8;--orange-dim:rgba(232,118,58,0.10);--green:#2D8A4E;--red:#C0392B}
+:root{--orange:#E8763A;--charcoal:#1C1A18;--surface:#FFFFFF;--offwhite:#1C1A18;--muted:#6B7280;--deep:#F9FAFB;--ink:#1C1A18;--border:#E5E7EB;--border-light:#F3F4F6;--orange-dim:rgba(232,118,58,0.08);--green:#16A34A;--red:#DC2626;--shadow-sm:0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);--shadow-md:0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background:#F2F0EC;color:#1C1A18;font-size:14px;line-height:1.5}
-.hdr{position:sticky;top:0;z-index:100;background:#1C1A18;border-bottom:1px solid #2E2C29;padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between}
+body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background:#F9FAFB;color:#1C1A18;font-size:14px;line-height:1.5}
+.hdr{position:sticky;top:0;z-index:100;background:#1C1A18;border-bottom:none;box-shadow:0 1px 0 rgba(255,255,255,0.06);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between}
 .logo{display:flex;align-items:center}
 .hdr-r{display:flex;align-items:center;gap:8px}
 .nbtn{background:transparent;border:none;color:#888480;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:6px 10px;cursor:pointer;transition:color 0.15s}
@@ -17,18 +17,19 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .abtn{background:#E8763A;border:none;border-radius:20px;color:#1C1A18;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;padding:6px 14px;cursor:pointer;margin-left:14px;padding-left:18px;position:relative}
 .hdr-r .abtn::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:16px;background:#2E2C29}
 .view{display:none}.view.on{display:block}
-.wrap{max-width:720px;margin:0 auto;padding:32px 16px 110px}
+.wrap{max-width:720px;margin:0 auto;padding:32px 16px 140px}
+#view-jobs .wrap{padding-top:16px}
 .pgtitle{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;letter-spacing:-0.5px;color:#1C1A18;text-transform:uppercase;margin-bottom:2px}
 .pgsub{font-family:'Barlow',sans-serif;font-size:12px;color:#7A7570;letter-spacing:0.3px;margin-bottom:28px}
-.card{background:#FFFFFF;border:1px solid #E2DDD8;border-radius:10px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(28,26,24,0.06)}
-.card-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:0.5px;color:#1C1A18;margin-bottom:8px}
-.card-sub{font-size:13px;color:#7A7570;line-height:1.6;margin-bottom:12px}
-.sec{background:#FFFFFF;border:1px solid #E2DDD8;border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(28,26,24,0.06)}
-.sec:not(.shut){border-left:2px solid #E8763A}
-.sechdr{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:1px solid #E2DDD8;background:#F7F5F2;transition:background 0.15s}
-.sechdr:hover{background:#F2F0EC}
+.card{background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow-sm)}
+.card-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:#6B7280;margin-bottom:12px}
+.card-sub{font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:12px}
+.sec{background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.sec:not(.shut){border-left:3px solid #E8763A}
+.sechdr{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:1px solid #F3F4F6;background:#FAFAFA;transition:background 0.15s}
+.sechdr:hover{background:#F5F5F5}
 .sechdr-l{display:flex;align-items:center;gap:8px}
-.sectitle{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#1C1A18}
+.sectitle{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:#374151}
 .secarr{color:#7A7570;font-size:18px;transition:transform 0.15s}
 .sec.shut .secarr{transform:rotate(-90deg)}
 .sec.shut .secbody{display:none}
@@ -42,8 +43,8 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 @media(max-width:480px){.c2,.c3{grid-template-columns:1fr}}
 .fld{display:flex;flex-direction:column;gap:5px}
 .fld label{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7A7570}
-.fld input,.fld textarea{background:#F7F5F2;border:1px solid #E2DDD8;border-radius:6px;color:#1C1A18;font-family:'Barlow',sans-serif;font-size:14px;padding:9px 12px;width:100%;outline:none;transition:border-color 0.15s,background 0.15s}
-.fld input:focus,.fld textarea:focus{border-color:#E8763A;background:#FFFFFF;box-shadow:0 0 0 3px rgba(232,118,58,0.10)}
+.fld input,.fld textarea{background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;color:#1C1A18;font-family:'Barlow',sans-serif;font-size:14px;padding:10px 14px;width:100%;outline:none;transition:border-color 0.15s,background 0.15s}
+.fld input:focus,.fld textarea:focus{background:#FFFFFF;border-color:#E8763A;box-shadow:0 0 0 3px rgba(232,118,58,0.08)}
 .fld input::placeholder,.fld textarea::placeholder{color:#C4BDB7}
 .fld textarea{resize:vertical;min-height:80px;line-height:1.5}
 .fld textarea.lg{min-height:110px}
@@ -62,44 +63,54 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .pill.done{background:#EAF7EE;color:#2D8A4E;border:1px solid rgba(45,138,78,0.25)}
 .pill.err{background:#FDECEA;color:#C0392B;border:1px solid rgba(192,57,43,0.25)}
 .typerow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.typeopt{background:#FFFFFF;border:1.5px solid #E2DDD8;border-radius:10px;padding:14px 16px;cursor:pointer;transition:all 0.15s}
-.typeopt:hover{border-color:#7A7570}
+.typeopt{background:#FFFFFF;border:1.5px solid #E5E7EB;border-radius:10px;padding:16px;cursor:pointer;transition:all 0.15s}
+.typeopt:hover{border-color:#6B7280}
 .typeopt.sel{border-color:#E8763A;background:#FFF8F4;box-shadow:0 0 0 1px #E8763A}
 .typeopt .ti{font-size:18px;margin-bottom:6px}
-.typeopt .tn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:#1C1A18;margin-bottom:2px}
-.typeopt .td{font-size:11px;color:#7A7570}
-.jcard{background:#FFFFFF;border:1px solid #E2DDD8;border-radius:10px;padding:18px 20px;margin-bottom:6px;cursor:pointer;display:block;transition:all 0.15s;position:relative;box-shadow:0 1px 4px rgba(28,26,24,0.06)}
-.jcard:hover{border-color:#E8763A;transform:translateY(-1px);box-shadow:0 4px 16px rgba(28,26,24,0.12)}
+.typeopt .tn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:#1C1A18;margin-bottom:2px}
+.typeopt .td{font-size:11px;color:#6B7280}
+.jcard{background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;margin-bottom:8px;cursor:pointer;display:block;transition:all 0.15s;position:relative;box-shadow:var(--shadow-sm)}
+.jcard:hover{border-color:#E8763A;box-shadow:var(--shadow-md);transform:translateY(-1px)}
 .jcard:last-child{margin-bottom:0}
-.jcard-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:#1C1A18;padding-right:30px;line-height:1.3}
-.jcard-sub{font-family:'Barlow',sans-serif;font-size:12px;color:#7A7570;margin-top:4px;padding-right:30px}
-.jcard-meta{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
-.jbadge,.badge{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:transparent;border:1px solid #E2DDD8;color:#7A7570;padding:2px 8px;border-radius:3px}
-.bdone{background:#EAF7EE;border-color:transparent;color:#2D8A4E}
-.bdraft{background:#F2F0EC;border-color:#E2DDD8;color:#7A7570}
-.jref{font-family:'Barlow',sans-serif;font-weight:400;font-size:12px;color:#7A7570;letter-spacing:0;text-transform:none}
-.jaddr{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:#1C1A18;margin-bottom:2px}
-.jmeta{font-size:12px;color:#7A7570}
-.jcard-date{font-size:11px;color:#7A7570;margin-top:8px;text-align:right}
-.jcard-del{position:absolute;top:8px;right:8px;background:none;border:none;color:#C4BDB7;font-size:14px;cursor:pointer;padding:4px 6px;line-height:1}
-.jcard-del:hover{color:#C0392B}
-.jcard-reopen{display:inline-block;margin-top:10px;background:transparent;border:1px solid #E2DDD8;border-radius:6px;color:#7A7570;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.5px;text-transform:uppercase;padding:6px 12px;cursor:pointer}
+.jcard-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:#1C1A18;line-height:1.3;margin-bottom:3px;padding-right:28px}
+.jcard-sub{font-family:'Barlow',sans-serif;font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.jcard-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:8px;margin-top:8px}
+.jbadge,.badge{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;background:transparent;border:1px solid #E5E7EB;color:#6B7280;padding:2px 8px;border-radius:3px}
+.bdone{background:#F0FDF4;border-color:rgba(22,163,74,0.2);color:#16A34A}
+.bdraft{background:#F9FAFB;border-color:#E5E7EB;color:#9CA3AF}
+.jref{font-family:'Barlow',sans-serif;font-weight:400;font-size:12px;color:#6B7280;letter-spacing:0;text-transform:none}
+.jaddr{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:#1C1A18;line-height:1.3;margin-bottom:3px;padding-right:28px}
+.jmeta{font-size:12px;color:#6B7280}
+.jcard-date{font-size:11px;color:#9CA3AF;margin-left:auto;white-space:nowrap}
+.jcard-del{position:absolute;top:12px;right:12px;background:none;border:none;color:#D1D5DB;font-size:13px;cursor:pointer;padding:4px;line-height:1}
+.jcard-del:hover{color:#DC2626}
+.jcard-reopen{display:inline-block;margin-top:10px;background:transparent;border:1px solid #E5E7EB;border-radius:6px;color:#6B7280;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.5px;text-transform:uppercase;padding:6px 12px;cursor:pointer}
 .jcard-reopen:hover{border-color:#E8763A;color:#E8763A}
-.jprogress{height:3px;background:#F2F0EC;border-radius:2px;overflow:hidden;margin-top:12px}
+.jprogress{height:3px;background:#F3F4F6;border-radius:2px;overflow:hidden;margin-top:10px;width:100%}
 .jprogress-bar{height:100%;background:#E8763A;transition:width 0.2s}
 .jprogress-label{display:none}
-.jsec{margin-bottom:14px;border:1px solid #E2DDD8;border-radius:12px;background:#FFFFFF;overflow:hidden}
-.jsec-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none;background:#F7F5F2;border-bottom:1px solid #E2DDD8}
+.jsec{background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;box-shadow:var(--shadow-sm);margin-bottom:12px;overflow:hidden}
+.jsec-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;user-select:none;background:#FFFFFF;border-bottom:1px solid #F3F4F6}
 .jsec.jsec-collapsed .jsec-hdr{border-bottom:none}
-.jsec-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;color:#7A7570;letter-spacing:2px;text-transform:uppercase}
-.jsec-count{color:#7A7570;font-weight:400;margin-left:4px}
-.jsec-arr{font-size:14px;color:#7A7570;line-height:1;transition:transform 0.15s}
+.jsec-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;color:#6B7280;letter-spacing:2px;text-transform:uppercase}
+.jsec-count{font-size:11px;color:#9CA3AF;font-weight:400;margin-left:6px}
+.jsec-arr{font-size:16px;color:#9CA3AF;line-height:1;transition:transform 0.15s}
 .jsec.jsec-collapsed .jsec-arr{transform:rotate(-90deg)}
 .jsec-body{padding:12px}
-.jsec.jsec-collapsed .jsec-body{display:none}
-.jsec-empty{font-size:13px;color:#7A7570;text-align:center;padding:14px 0}
-.add-job-cta{width:100%;background:transparent;border:1px solid #E2DDD8;color:#7A7570;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:10px;border-radius:8px;margin-bottom:10px;cursor:pointer;transition:all 0.15s}
-.add-job-cta:hover{border-color:#E8763A;color:#E8763A;opacity:1;background:transparent}
+.jsec.jsec-collapsed .jsec-body{display:none;padding:0;min-height:0}
+.jsec-empty{font-size:13px;color:#9CA3AF;text-align:center;padding:20px 0;font-style:italic}
+#jsec-awaiting{border-left:3px solid #E8763A}
+#jsec-awaiting .jsec-title{color:#E8763A}
+.summary-strip{display:grid;grid-template-columns:1fr 1fr 1fr;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;margin-bottom:20px;box-shadow:var(--shadow-sm);overflow:hidden}
+.stat-tile{padding:16px;text-align:center;position:relative}
+.stat-tile--divider::before,.stat-tile--divider::after{content:'';position:absolute;top:20%;bottom:20%;width:1px;background:#E5E7EB}
+.stat-tile--divider::before{left:0}
+.stat-tile--divider::after{right:0}
+.stat-val{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:32px;color:#1C1A18;line-height:1;margin-bottom:4px}
+.stat-label{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#6B7280}
+.stat-tile.stat-orange .stat-val{color:#E8763A}
+.add-job-cta{width:100%;background:transparent;border:1px dashed #D1D5DB;color:#9CA3AF;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:12px;border-radius:8px;margin-bottom:8px;cursor:pointer;transition:all 0.15s}
+.add-job-cta:hover{border-color:#E8763A;color:#E8763A;border-style:solid;background:rgba(232,118,58,0.04)}
 .recbox{border:1px solid #E2DDD8;border-radius:10px;overflow:hidden;margin-bottom:14px;background:#FFFFFF}
 .rectop{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;background:#F7F5F2;border-bottom:1px solid #E2DDD8}
 .reclbl{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#7A7570}
@@ -120,16 +131,15 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .phnum{position:absolute;top:6px;left:6px;background:#E8763A;color:#FFFFFF;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px}
 .phdel{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);border:none;color:#fff;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
 .phcap{background:#FFFFFF;border:none;border-top:1px solid #E2DDD8;color:#7A7570;font-size:11px;padding:6px 8px;width:100%;font-family:inherit;outline:none}
-.genbar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#FFFFFF;border-top:2px solid #E2DDD8;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px;box-shadow:0 -4px 20px rgba(28,26,24,0.08)}
-.geninfo{font-size:11px;color:#7A7570;min-width:0;flex:1;overflow:hidden}
-.geninfo strong{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:#1C1A18;text-transform:uppercase;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.geninfo>div{color:#7A7570;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.geninfo .pill{display:inline-block;font-size:10px;padding:2px 6px;margin-top:2px;border-radius:4px}
-.genbar .pbtn{background:#E8763A;color:#FFFFFF;font-size:15px;padding:12px 28px}
+.genbar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#FFFFFF;border-top:1px solid #E5E7EB;padding:10px 16px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:0 -4px 24px rgba(0,0,0,0.08)}
+.genbar-secondary{display:flex;gap:8px}
+.genbar-primary{display:flex;gap:8px}
+.genbar .pbtn{flex:1;background:#E8763A;color:#FFFFFF;font-size:15px;padding:13px;border-radius:8px;text-align:center}
 .genbar .pbtn:hover{background:#D4682E;color:#FFFFFF}
-.genbar .pbtn:disabled,.genbar .pbtn:disabled:hover{background:#E2DDD8;color:#7A7570;cursor:not-allowed}
-#finalise-btn.finalise-muted{font-size:11px;padding:9px 12px;white-space:normal;line-height:1.2;max-width:200px}
-.binvoiced{background:#EAF7EE;border-color:transparent;color:#2D8A4E}
+.genbar .pbtn:disabled,.genbar .pbtn:disabled:hover{background:#E5E7EB;color:#9CA3AF;cursor:not-allowed}
+.genbar .sbtn{flex:1;font-size:13px;padding:10px}
+#finalise-btn.finalise-muted{font-size:11px;padding:9px 12px;white-space:normal;line-height:1.2}
+.binvoiced{background:#F0FDF4;border-color:rgba(22,163,74,0.2);color:#16A34A}
 .worow{display:flex;gap:10px;align-items:flex-start}
 .wotxt{flex:1;background:#F7F5F2;border:1px solid #E2DDD8;border-radius:6px;color:#1C1A18;font-family:'Barlow',sans-serif;font-size:14px;padding:9px 12px;min-height:90px;resize:vertical;line-height:1.5;outline:none;transition:border-color 0.15s,background 0.15s}
 .wotxt:focus{border-color:#E8763A;background:#FFFFFF;box-shadow:0 0 0 3px rgba(232,118,58,0.10)}
@@ -196,9 +206,9 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .rec-error-row{margin-top:10px;padding:12px;background:#FDECEA;border:1px solid #C0392B;border-radius:8px}
 .rec-error-msg{color:#C0392B;font-size:13px;line-height:1.5;margin-bottom:10px}
 .rec-error-row .aibtn{margin-top:0}
-.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:#F2F0EC}
-.auth-card{background:#FFFFFF;border:1px solid #E2DDD8;border-radius:14px;padding:28px 26px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(28,26,24,0.10);position:relative}
-.auth-card::before{content:'';display:block;height:3px;background:linear-gradient(90deg,#E8763A,transparent);border-radius:14px 14px 0 0;margin:-28px -26px 24px}
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:#F9FAFB}
+.auth-card{background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:32px 28px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.08);position:relative}
+.auth-card::before{content:'';display:block;height:3px;background:linear-gradient(90deg,#E8763A,transparent);border-radius:16px 16px 0 0;margin:-32px -28px 28px}
 .auth-logo{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;text-transform:uppercase;letter-spacing:-0.5px;color:#1C1A18;text-align:center;margin-bottom:6px}
 .auth-logo span{color:#E8763A}
 .auth-tag{font-size:13px;color:#7A7570;text-align:center;margin-bottom:20px}
@@ -277,8 +287,20 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 <!-- JOBS -->
 <div class="view" id="view-jobs">
   <div class="wrap">
-    <div class="pgtitle">Reports</div>
-    <div class="pgsub">All your inspection reports</div>
+    <div class="summary-strip">
+      <div class="stat-tile" id="stat-tile-inprogress">
+        <div class="stat-val" id="stat-inprogress">0</div>
+        <div class="stat-label">In Progress</div>
+      </div>
+      <div class="stat-tile stat-tile--divider" id="stat-tile-awaiting">
+        <div class="stat-val" id="stat-awaiting">0</div>
+        <div class="stat-label">Awaiting Invoice</div>
+      </div>
+      <div class="stat-tile" id="stat-tile-completed">
+        <div class="stat-val" id="stat-completed">0</div>
+        <div class="stat-label">This Month</div>
+      </div>
+    </div>
     <div id="jobs-list"></div>
   </div>
 </div>
@@ -361,16 +383,16 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 
     <div class="typerow">
       <div class="typeopt sel" id="type-roof" onclick="setType('roof')">
-        <div class="ti">&#127968;</div><div class="tn">Roof Inspection</div><div class="td">Storm, hail, insurance</div>
+        <div class="tn">Roof Inspection</div><div class="td">Storm, hail, insurance</div>
       </div>
       <div class="typeopt" id="type-leak" onclick="setType('leak')">
-        <div class="ti">&#128167;</div><div class="tn">Leak Investigation</div><div class="td">Water ingress, entry point</div>
+        <div class="tn">Leak Investigation</div><div class="td">Water ingress, entry point</div>
       </div>
     </div>
 
     <div class="sec" id="sec-details">
       <div class="sechdr" onclick="toggleSec('sec-details')">
-        <div class="sechdr-l"><span>&#128203;</span><span class="sectitle">Job Details</span></div>
+        <div class="sechdr-l"><span class="sectitle">Job Details</span></div>
         <span class="secarr">&#8964;</span>
       </div>
       <div class="secbody">
@@ -526,11 +548,14 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 </div>
 
 <div class="genbar" id="gen-bar" style="display:none">
-  <div class="geninfo"><strong id="gen-name">New Report</strong><div id="gen-status"></div></div>
-  <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
-    <button type="button" class="savedraft" onclick="saveDraftBtn()" style="font-size:13px;padding:9px 14px">Save</button>
-    <button type="button" class="savedraft" onclick="markComplete()" style="font-size:13px;padding:9px 14px">Mark Complete</button>
-    <button type="button" class="pbtn" id="gen-btn" onclick="generate()" style="font-size:15px;padding:12px 28px">Generate PDF</button>
+  <span id="gen-name" style="display:none">New Report</span>
+  <span id="gen-status" style="display:none"></span>
+  <div class="genbar-secondary">
+    <button type="button" class="sbtn" id="save-btn" onclick="saveDraftBtn()">Save</button>
+    <button type="button" class="sbtn" id="complete-btn" onclick="markComplete()">Mark Complete</button>
+  </div>
+  <div class="genbar-primary">
+    <button type="button" class="pbtn" id="gen-btn" onclick="generate()">Generate PDF</button>
     <button type="button" class="pbtn" id="finalise-btn" onclick="finaliseInvoice()" style="display:none">Finalise &amp; Invoice</button>
   </div>
 </div>
@@ -1332,7 +1357,9 @@ function formatRelative(ts){
 
 function toggleJobSection(key){
   var sk = 'tr_jsec_' + key + '_collapsed';
-  if(localStorage.getItem(sk) === '1') localStorage.removeItem(sk);
+  var stored = localStorage.getItem(sk);
+  var currentlyCollapsed = stored === null ? (key === 'completed') : (stored === '1');
+  if(currentlyCollapsed) localStorage.setItem(sk, '0');
   else localStorage.setItem(sk, '1');
   renderJobs();
 }
@@ -1384,7 +1411,11 @@ function reopenJob(id){
 function renderJobCard(j, sectionKey){
   var typeLabel = j.type === 'leak' ? 'Leak Investigation' : 'Roof Inspection';
   var title = j.address || j.client || 'Untitled report';
-  var sub = (j.client && j.address) ? esc(j.client) : (j.customer ? esc(j.customer) : '');
+  var subParts = [];
+  if(j.client && j.address) subParts.push(esc(j.client));
+  else if(j.customer) subParts.push(esc(j.customer));
+  if(j.ref) subParts.push('Ref: '+esc(j.ref));
+  var sub = subParts.join(' &middot; ');
   var html = '<div class="jcard" onclick="openJob(\''+j.id+'\')">';
   html += '<button class="jcard-del" onclick="event.stopPropagation();deleteJob(\''+j.id+'\')" title="Delete">&#128465;</button>';
   html += '<div class="jcard-title">'+esc(title)+'</div>';
@@ -1392,17 +1423,17 @@ function renderJobCard(j, sectionKey){
   html += '<div class="jcard-meta">';
   html += '<span class="jbadge">'+typeLabel+'</span>';
   if(j.invoiced) html += '<span class="jbadge binvoiced">&#10003; Invoiced</span>';
-  if(j.ref) html += '<span class="jref">Ref: '+esc(j.ref)+'</span>';
+  var dateText = '';
+  if((sectionKey === 'completed' || sectionKey === 'awaiting') && j.completedAt){
+    dateText = formatRelative(j.completedAt);
+  } else if(j.updatedAt){
+    dateText = formatRelative(j.updatedAt);
+  }
+  if(dateText) html += '<span class="jcard-date">'+dateText+'</span>';
   html += '</div>';
   if(sectionKey === 'inprogress'){
     var pct = jobProgress(j);
     html += '<div class="jprogress"><div class="jprogress-bar" style="width:'+pct+'%"></div></div>';
-    html += '<div class="jprogress-label">'+pct+'%</div>';
-  }
-  if(sectionKey === 'completed' && j.completedAt){
-    html += '<div class="jcard-date">Completed: '+formatRelative(j.completedAt)+'</div>';
-  } else if(j.updatedAt){
-    html += '<div class="jcard-date">Last edited: '+formatRelative(j.updatedAt)+'</div>';
   }
   if(sectionKey === 'completed'){
     html += '<button class="jcard-reopen" onclick="event.stopPropagation();reopenJob(\''+j.id+'\')">Reopen</button>';
@@ -1413,30 +1444,58 @@ function renderJobCard(j, sectionKey){
 
 function renderJobs(){
   var el = document.getElementById('jobs-list');
+  /* Jobs within each section: newest first by updatedAt or createdAt */
+  var sorted = jobs.slice().sort(function(a,b){ return (b.updatedAt||0)-(a.updatedAt||0); });
   var sections = {
-    incoming:   { title: 'INCOMING',    list: [], empty: 'No incoming jobs. Tap + Add New Job to start one.' },
-    inprogress: { title: 'IN PROGRESS', list: [], empty: 'Nothing in progress.' },
-    completed:  { title: 'COMPLETED',   list: [], empty: 'No completed reports yet.' }
+    incoming:   { title: 'INCOMING',         id: 'jsec-incoming',   list: [], empty: 'No incoming jobs. Tap + Add New Job to start one.', defaultCollapsed: false },
+    inprogress: { title: 'IN PROGRESS',      id: 'jsec-inprogress', list: [], empty: 'Nothing in progress.',                              defaultCollapsed: false },
+    awaiting:   { title: 'AWAITING INVOICE', id: 'jsec-awaiting',   list: [], empty: 'No reports awaiting invoice.',                     defaultCollapsed: false },
+    completed:  { title: 'COMPLETED',        id: 'jsec-completed',  list: [], empty: 'No completed reports yet.',                        defaultCollapsed: true }
   };
-  jobs.slice().reverse().forEach(function(j){
-    var key = j.status === 'completed' ? 'completed' : (j.status === 'incoming' ? 'incoming' : 'inprogress');
+  sorted.forEach(function(j){
+    var key;
+    if(j.status === 'completed'){
+      key = j.invoiced ? 'completed' : 'awaiting';
+    } else if(j.status === 'incoming'){
+      key = 'incoming';
+    } else {
+      key = 'inprogress';
+    }
     sections[key].list.push(j);
   });
+  var now = new Date();
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  var completedThisMonth = sections.completed.list.filter(function(j){
+    return j.completedAt && j.completedAt >= monthStart;
+  }).length;
+  var statIn = document.getElementById('stat-inprogress');
+  var statAw = document.getElementById('stat-awaiting');
+  var statCm = document.getElementById('stat-completed');
+  if(statIn) statIn.textContent = sections.inprogress.list.length;
+  if(statAw) statAw.textContent = sections.awaiting.list.length;
+  if(statCm) statCm.textContent = completedThisMonth;
+  var awTile = document.getElementById('stat-tile-awaiting');
+  if(awTile){
+    if(sections.awaiting.list.length > 0) awTile.classList.add('stat-orange');
+    else awTile.classList.remove('stat-orange');
+  }
   var out = '';
-  ['incoming','inprogress','completed'].forEach(function(key){
+  ['incoming','inprogress','awaiting','completed'].forEach(function(key){
     var sec = sections[key];
-    var collapsed = localStorage.getItem('tr_jsec_'+key+'_collapsed') === '1';
+    var stored = localStorage.getItem('tr_jsec_'+key+'_collapsed');
+    var collapsed = stored === null ? sec.defaultCollapsed : (stored === '1');
+    if((key === 'incoming' || key === 'inprogress') && sec.list.length === 0) collapsed = true;
     var body = '';
-    if(key === 'incoming') body += '<button class="pbtn add-job-cta" onclick="newJob()">+ Add New Job</button>';
+    if(key === 'incoming') body += '<button class="add-job-cta" onclick="newJob()">+ Add New Job</button>';
     body += sec.list.length
       ? sec.list.map(function(j){ return renderJobCard(j, key); }).join('')
       : '<div class="jsec-empty">'+sec.empty+'</div>';
-    out += '<div class="jsec'+(collapsed?' jsec-collapsed':'')+'" data-sec="'+key+'">' +
+    out += '<div class="jsec'+(collapsed?' jsec-collapsed':'')+'" id="'+sec.id+'" data-sec="'+key+'">' +
       '<div class="jsec-hdr" onclick="toggleJobSection(\''+key+'\')">' +
         '<span class="jsec-title">'+sec.title+' <span class="jsec-count">('+sec.list.length+')</span></span>' +
         '<span class="jsec-arr">&#8964;</span>' +
       '</div>' +
-      '<div class="jsec-body">'+body+'</div>' +
+      '<div class="jsec-body" id="'+sec.id+'-body">'+body+'</div>' +
       '</div>';
   });
   el.innerHTML = out;
