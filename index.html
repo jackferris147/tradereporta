@@ -542,7 +542,6 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
     </div>
 
     <div class="form-actions">
-      <button type="button" class="pbtn" id="gen-btn" onclick="generate()">Generate PDF</button>
       <button type="button" class="sbtn" id="export-btn" onclick="exportJobPack()" style="display:none">Export Pack</button>
     </div>
   </div>
@@ -564,6 +563,10 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
   <div class="genbar-secondary">
     <button type="button" class="sbtn" id="save-btn" onclick="saveDraftBtn()">Save</button>
     <button type="button" class="sbtn" id="complete-btn" onclick="markComplete()">Mark Complete</button>
+  </div>
+  <div class="genbar-primary">
+    <button type="button" class="pbtn" id="gen-btn" onclick="generate()">Generate PDF</button>
+    <button type="button" class="pbtn" id="finalise-btn" onclick="finaliseInvoice()" style="display:none">Finalise &amp; Invoice</button>
   </div>
 </div>
 
@@ -953,6 +956,7 @@ async function finaliseInvoice(){
     btn.disabled = true;
     btn.innerHTML = 'Invoice sent &#10003;';
     showToast('Invoice sent ✓');
+    updateGenBar();
   } catch(e){
     btn.disabled = false;
     btn.innerHTML = 'Finalise &amp; Invoice';
@@ -1025,7 +1029,7 @@ function goView(v){
   document.querySelectorAll('.view').forEach(function(el){ el.classList.remove('on'); });
   document.getElementById('view-'+v).classList.add('on');
   document.getElementById('gen-bar').style.display = v==='form'?'flex':'none';
-  if(v==='form'){ updateFinaliseBtn(); updateCompleteBtn(); }
+  if(v==='form') updateGenBar();
   var hdr = document.getElementById('app-hdr');
   if(hdr) hdr.style.display = v==='auth' ? 'none' : 'flex';
   ['jobs','settings'].forEach(function(n){ document.getElementById('nav-'+n).classList.toggle('on', n===v); });
@@ -1410,22 +1414,31 @@ function markComplete(){
   goView('jobs');
 }
 
-function updateCompleteBtn(){
-  var btn = document.getElementById('complete-btn');
-  if(!btn) return;
-  var j = cid && jobs.find(function(x){ return x.id === cid; });
-  if(j && j.status === 'completed'){
-    btn.textContent = 'Reopen';
-    btn.onclick = function(){ reopenJobCurrent(); };
-  } else {
-    btn.textContent = 'Mark Complete';
-    btn.onclick = function(){ markComplete(); };
-  }
-}
+function updateGenBar(){
+  var saveBtn = document.getElementById('save-btn');
+  var completeBtn = document.getElementById('complete-btn');
+  var genBtn = document.getElementById('gen-btn');
+  var finaliseBtn = document.getElementById('finalise-btn');
+  var secondaryRow = document.querySelector('.genbar-secondary');
+  var primaryRow = document.querySelector('.genbar-primary');
 
-function reopenJobCurrent(){
-  if(!cid) return;
-  reopenJob(cid);
+  var j = cid && jobs.find(function(x){ return x.id === cid; });
+  var status = j ? j.status : 'incoming';
+  var invoiced = !!(j && j.invoiced);
+
+  var showSave = !invoiced;
+  var showComplete = (status !== 'completed');
+  var showGen = true;
+  var showFinalise = (status === 'completed' && !invoiced);
+
+  if(showFinalise) updateFinaliseBtn();
+
+  if(saveBtn) saveBtn.style.display = showSave ? '' : 'none';
+  if(completeBtn) completeBtn.style.display = showComplete ? '' : 'none';
+  if(genBtn) genBtn.style.display = showGen ? '' : 'none';
+  if(finaliseBtn) finaliseBtn.style.display = showFinalise ? '' : 'none';
+  if(secondaryRow) secondaryRow.style.display = (showSave || showComplete) ? '' : 'none';
+  if(primaryRow) primaryRow.style.display = (showGen || showFinalise) ? '' : 'none';
 }
 
 function reopenJob(id){
