@@ -875,25 +875,43 @@ function updateFinaliseBtn(){
   btn.innerHTML = 'Finalise &amp; Invoice';
 }
 
+var invoiceInFlight = false;
 async function finaliseInvoice(){
-  var j = jobs.find(function(x){ return x.id === cid; });
-  if(!j){ showToast('No job open'); return; }
-  var url = getWebhookUrl();
-  if(!url){ showToast('Set webhook in Settings to enable invoicing'); return; }
   var btn = document.getElementById('finalise-btn');
-  btn.disabled = true;
+  // Disable immediately + in-flight flag so a double-tap can't fire twice.
+  if(invoiceInFlight || (btn && btn.disabled)) return;
+  if(btn) btn.disabled = true;
+
+  var j = jobs.find(function(x){ return x.id === cid; });
+  if(!j){ showToast('No job open'); if(btn) btn.disabled = false; return; }
+  var url = getWebhookUrl();
+  if(!url){ showToast('Set webhook in Settings to enable invoicing'); updateFinaliseBtn(); return; }
+
+  // Guard: don't fire with an incomplete payload.
+  var payload = {
+    po_number: (j.ref || '').trim(),
+    address: (j.address || '').trim(),
+    client: (j.client || '').trim(),
+    date: invoiceDate()
+  };
+  var missing = ['po_number','address','client','date'].filter(function(k){ return !payload[k]; });
+  if(missing.length){
+    showToast('Missing ' + missing.join(', ') + ' — complete the report first');
+    updateFinaliseBtn();
+    return;
+  }
+
+  invoiceInFlight = true;
   btn.classList.remove('finalise-muted');
   btn.textContent = 'Sending…';
   try {
     var r = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        po_number: j.ref || '',
-        address: j.address || '',
-        client: j.client || '',
-        date: invoiceDate()
-      })
+      // text/plain keeps this a CORS "simple request" so the browser does NOT
+      // send a preflight OPTIONS call — that empty preflight was the phantom
+      // second webhook trigger. Make.com parses the JSON body regardless.
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(payload)
     });
     if(!r.ok) throw new Error('HTTP ' + r.status);
     j.invoiced = true;
@@ -906,6 +924,8 @@ async function finaliseInvoice(){
     btn.disabled = false;
     btn.innerHTML = 'Finalise &amp; Invoice';
     showToast('Invoice failed — try again');
+  } finally {
+    invoiceInFlight = false;
   }
 }
 
