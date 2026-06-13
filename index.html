@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Trade Reporta</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{--orange:#E8763A;--charcoal:#1C1A18;--surface:#FFFFFF;--offwhite:#1C1A18;--muted:#6B7280;--deep:#F9FAFB;--ink:#1C1A18;--border:#E5E7EB;--border-light:#F3F4F6;--orange-dim:rgba(232,118,58,0.08);--green:#16A34A;--red:#DC2626;--shadow-sm:0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);--shadow-md:0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -553,6 +554,7 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
   <div class="genbar-secondary">
     <button type="button" class="sbtn" id="save-btn" onclick="saveDraftBtn()">Save</button>
     <button type="button" class="sbtn" id="complete-btn" onclick="markComplete()">Mark Complete</button>
+    <button type="button" class="sbtn" id="export-btn" onclick="exportJobPack()" style="display:none">Export Pack</button>
   </div>
   <div class="genbar-primary">
     <button type="button" class="pbtn" id="gen-btn" onclick="generate()">Generate PDF</button>
@@ -575,6 +577,7 @@ var jobs = (function(){
   } catch(e){ return []; }
 })();
 var cid = null, jtype = 'roof', photos = [], busy = false, photosLoaded = false;
+var pdfBlobCache = { jobId: null, blob: null };
 var mrec = null, achunks = [], rtimer = null, rsecs = 0;
 var audioBlob = null, audioURL = null;
 var emrec = null, eachunks = [];
@@ -1524,6 +1527,7 @@ function clearForm(){
   if(audioURL){ URL.revokeObjectURL(audioURL); audioURL = null; }
   audioBlob = null;
   photos = [];
+  updateExportBtnVisibility();
   switchTab('import');
 }
 
@@ -1940,6 +1944,14 @@ function renderPhotos(){
     }
     return '<div class="ph">'+imgHtml+'<span class="phnum">'+(i+1)+'</span><button class="phdel" onclick="removePhoto('+i+')">x</button><input class="phcap" value="'+p.cap+'" placeholder="Caption..." onchange="photos['+i+'].cap=this.value"></div>';
   }).join('');
+  updateExportBtnVisibility();
+}
+
+function updateExportBtnVisibility(){
+  var btn = document.getElementById('export-btn');
+  if(!btn) return;
+  var hasPhotos = (photos||[]).some(function(p){ return p && p.url; });
+  btn.style.display = hasPhotos ? '' : 'none';
 }
 
 function removePhoto(i){ photos.splice(i,1); renderPhotos(); }
@@ -2118,6 +2130,80 @@ function cancelPreviewEdit(){
   previewEditingField = null;
   document.removeEventListener('click', handlePreviewOutsideClick, true);
   renderPreview();
+}
+
+function sanitizeFileSegment(s){
+  return (s||'').replace(/[\/\\?%*:|"<>]/g,'').replace(/\s+/g,' ').trim();
+}
+
+function compressPhotoForExport(dataUrl){
+  return new Promise(function(resolve, reject){
+    if(!dataUrl){ reject(new Error('no data url')); return; }
+    var img = new Image();
+    img.onload = function(){
+      var maxSide = 1920;
+      var w = img.width, h = img.height;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      try {
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function(blob){
+          if(!blob){ reject(new Error('toBlob failed')); return; }
+          resolve(blob);
+        }, 'image/jpeg', 0.8);
+      } catch(e){ reject(e); }
+    };
+    img.onerror = function(){ reject(new Error('image decode failed')); };
+    img.src = dataUrl;
+  });
+}
+
+function exportJobPack(){
+  if(typeof JSZip === 'undefined'){ showToast('Zip library still loading'); return; }
+  var validPhotos = (photos||[]).filter(function(p){ return p && p.url; });
+  if(!validPhotos.length){ showToast('Add photos before exporting'); return; }
+  var btn = document.getElementById('export-btn');
+  var origLabel = btn ? btn.textContent : 'Export Pack';
+  if(btn){ btn.disabled = true; btn.textContent = 'Preparing...'; }
+  showToast('Compressing photos...');
+  var client = sanitizeFileSegment(g('f-client')) || 'Job';
+  var address = sanitizeFileSegment(g('f-address')) || 'Untitled';
+  var zipName = client + ' — ' + address + '.zip';
+  var includesPdf = pdfBlobCache.jobId === cid && pdfBlobCache.blob;
+  var zip = new JSZip();
+  var photosFolder = zip.folder('Photos');
+  Promise.all(validPhotos.map(function(p, i){
+    return compressPhotoForExport(p.url).then(function(blob){
+      var seq = String(i+1);
+      if(seq.length < 2) seq = '0' + seq;
+      var name = seq;
+      var cap = sanitizeFileSegment(p.cap);
+      if(cap) name += ' — ' + cap;
+      name += '.jpg';
+      photosFolder.file(name, blob);
+    }).catch(function(e){
+      console.error('[export] photo', i+1, 'failed:', e && e.message);
+    });
+  })).then(function(){
+    if(includesPdf) zip.file('Report.pdf', pdfBlobCache.blob);
+    return zip.generateAsync({ type: 'blob' });
+  }).then(function(zipBlob){
+    var url = URL.createObjectURL(zipBlob);
+    var a = document.createElement('a');
+    a.href = url; a.download = zipName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+    if(includesPdf) showToast('Job pack ready — check Downloads');
+    else showToast('Photos exported — generate PDF first to include it');
+  }).catch(function(e){
+    console.error('[export] zip failed:', e && e.message);
+    showToast('Export failed — try again');
+  }).then(function(){
+    if(btn){ btn.disabled = false; btn.textContent = origLabel; }
+  });
 }
 
 function generate(){
@@ -2467,6 +2553,7 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
       setPill('gen-status','PDF downloaded','done');
+      pdfBlobCache = { jobId: cid, blob: blob };
       saveJob();
       markPdfGenerated();
     })
