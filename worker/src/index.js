@@ -194,16 +194,23 @@ export default {
       if (url.pathname === "/api/google-auth" && request.method === "POST") {
         if (!userId) return jsonError(401, "Unauthorized", origin);
         if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REDIRECT_URI) {
-          console.error(`[${reqId}] Google OAuth secrets missing`);
+          console.error(`[${reqId}] Google OAuth secrets missing — CLIENT_ID set=${!!env.GOOGLE_CLIENT_ID}, CLIENT_SECRET set=${!!env.GOOGLE_CLIENT_SECRET}, REDIRECT_URI set=${!!env.GOOGLE_REDIRECT_URI}`);
           return jsonError(500, "Google OAuth not configured", origin);
         }
         let body;
         try {
           body = await request.json();
         } catch (e) {
+          console.error(`[${reqId}] /api/google-auth invalid JSON body`);
           return jsonError(400, "Invalid JSON", origin);
         }
-        if (!body || !body.code) return jsonError(400, "Missing code", origin);
+        if (!body || !body.code) {
+          console.error(`[${reqId}] /api/google-auth missing code in body`);
+          return jsonError(400, "Missing code", origin);
+        }
+        const codeLen = (body.code || "").length;
+        const clientIdTail = env.GOOGLE_CLIENT_ID.slice(-32);
+        console.log(`[${reqId}] /api/google-auth exchanging code len=${codeLen} redirect_uri="${env.GOOGLE_REDIRECT_URI}" client_id_tail="${clientIdTail}"`);
         let tokenRes;
         try {
           tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -221,22 +228,28 @@ export default {
           console.error(`[${reqId}] Google token fetch threw: ${e && e.message}`);
           return jsonError(502, "Token exchange failed", origin);
         }
-        let tokens;
-        try {
-          tokens = await tokenRes.json();
-        } catch (e) {
+        // Parse the body into JSON. Never log access_token / refresh_token; log keys only.
+        let tokens = null;
+        try { tokens = await tokenRes.json(); } catch (e) { /* leave tokens null */ }
+        const tokenKeys = tokens && typeof tokens === "object" ? Object.keys(tokens).join(",") : "(none)";
+        console.log(`[${reqId}] Google token response status=${tokenRes.status} content-type="${tokenRes.headers.get("content-type") || ""}" keys=${tokenKeys}`);
+        if (!tokens) {
+          console.error(`[${reqId}] Google token response was non-JSON`);
           return jsonError(502, "Token exchange returned non-JSON", origin);
         }
         if (!tokenRes.ok) {
-          console.error(`[${reqId}] Google token exchange ${tokenRes.status}: ${tokens && (tokens.error_description || tokens.error)}`);
+          // Error responses don't carry tokens; safe to log error + description.
+          console.error(`[${reqId}] Google token exchange ${tokenRes.status}: error="${tokens.error}" description="${tokens.error_description}"`);
           return new Response(JSON.stringify({ error: tokens.error || "Token exchange failed", details: tokens.error_description || null }), {
             status: tokenRes.status,
             headers: { "Content-Type": "application/json", ...baseHeaders }
           });
         }
         if (!tokens.refresh_token) {
+          console.error(`[${reqId}] Google token exchange succeeded but no refresh_token returned — keys=${Object.keys(tokens).join(",")}. User likely needs to revoke prior consent at https://myaccount.google.com/permissions then reconnect (prompt=consent in auth URL forces a fresh refresh_token).`);
           return jsonError(401, "No refresh token returned", origin);
         }
+        console.log(`[${reqId}] /api/google-auth success — stored refresh token for user ${userId} (token_type=${tokens.token_type}, scope="${tokens.scope}", expires_in=${tokens.expires_in})`);
         await env.TRADE_REPORTA_KV.put("gdrive_" + userId, tokens.refresh_token);
         return new Response(JSON.stringify({ success: true }), {
           status: 200,
