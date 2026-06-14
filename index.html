@@ -373,6 +373,19 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
       <div class="brand-fld"><label>Make.com Webhook URL</label><input type="text" id="webhook-url" placeholder="https://hook.eu1.make.com/..."></div>
       <button class="pbtn" onclick="saveWebhookUrl()" style="width:100%;margin-top:6px">Save Webhook</button>
     </div>
+    <div class="card" id="gdrive-card">
+      <div class="card-title">Google Drive</div>
+      <div class="card-sub" id="gdrive-status-text">
+        Connect Google Drive to automatically save job packs to your Drive.
+      </div>
+      <div style="margin-top:12px">
+        <button class="pbtn" id="gdrive-connect-btn" onclick="connectGoogleDrive()">Connect Google Drive</button>
+        <button class="sbtn" id="gdrive-disconnect-btn" style="display:none" onclick="disconnectGoogleDrive()">Disconnect</button>
+      </div>
+      <div id="gdrive-connected-info" style="display:none;margin-top:10px">
+        <span style="color:#16A34A;font-size:13px;font-weight:600">&#10003; Google Drive connected</span>
+      </div>
+    </div>
     <div class="card">
       <div class="card-title">About</div>
       <div style="font-size:13px;color:var(--muted);line-height:1.8">Trade Reporta v1.0 &mdash; Built by JFR Roofing Pty Ltd<br>ABN: 46 660 637 614 &middot; NSW Licence: 381433C</div>
@@ -878,6 +891,93 @@ function saveWebhookUrl(){
   updateFinaliseBtn();
 }
 
+// Public — safe in client code. Only the Client Secret stays server-side (Worker).
+var GOOGLE_CLIENT_ID = '132820091621-hfvfd6pi73uvomhlupruotgqvpocttkg.apps.googleusercontent.com';
+
+async function checkGoogleDriveStatus(){
+  try {
+    if(!supa) return;
+    var sess = await supa.auth.getSession();
+    var token = (sess && sess.data && sess.data.session && sess.data.session.access_token) || '';
+    if(!token) return;
+    var r = await fetch(WORKER + '/api/google-status', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if(!r.ok) return;
+    var data = await r.json();
+    var connectBtn = document.getElementById('gdrive-connect-btn');
+    var disconnectBtn = document.getElementById('gdrive-disconnect-btn');
+    var connectedInfo = document.getElementById('gdrive-connected-info');
+    var statusText = document.getElementById('gdrive-status-text');
+    if(data && data.connected){
+      if(connectBtn) connectBtn.style.display = 'none';
+      if(disconnectBtn) disconnectBtn.style.display = 'inline-block';
+      if(connectedInfo) connectedInfo.style.display = 'block';
+      if(statusText) statusText.textContent = 'Google Drive is connected. Job packs will upload automatically.';
+    } else {
+      if(connectBtn) connectBtn.style.display = 'inline-block';
+      if(disconnectBtn) disconnectBtn.style.display = 'none';
+      if(connectedInfo) connectedInfo.style.display = 'none';
+      if(statusText) statusText.textContent = 'Connect Google Drive to automatically save job packs to your Drive.';
+    }
+  } catch(e){ console.log('Drive status check failed', e && e.message); }
+}
+
+function connectGoogleDrive(){
+  if(!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID === 'REPLACE_WITH_CLIENT_ID'){
+    showToast('Google Client ID not configured');
+    return;
+  }
+  var clientId = GOOGLE_CLIENT_ID;
+  var redirectUri = encodeURIComponent(window.location.origin);
+  var scope = encodeURIComponent('https://www.googleapis.com/auth/drive.file');
+  var url = 'https://accounts.google.com/o/oauth2/v2/auth' +
+    '?client_id=' + clientId +
+    '&redirect_uri=' + redirectUri +
+    '&response_type=code' +
+    '&scope=' + scope +
+    '&access_type=offline' +
+    '&prompt=consent';
+  window.location.href = url;
+}
+
+async function disconnectGoogleDrive(){
+  // Future: delete KV entry via Worker route
+  showToast('Google Drive disconnected');
+  checkGoogleDriveStatus();
+}
+
+async function handleGoogleCallback(){
+  var params = new URLSearchParams(window.location.search);
+  var code = params.get('code');
+  if(!code) return;
+  // Strip code from URL immediately so a reload doesn't re-exchange it
+  window.history.replaceState({}, document.title, window.location.pathname);
+  showToast('Connecting Google Drive...');
+  try {
+    var sess = await supa.auth.getSession();
+    var token = (sess && sess.data && sess.data.session && sess.data.session.access_token) || '';
+    var r = await fetch(WORKER + '/api/google-auth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ code: code })
+    });
+    var data = await r.json();
+    if(data && data.success){
+      showToast('Google Drive connected ✓');
+      checkGoogleDriveStatus();
+      goView('settings');
+    } else {
+      showToast('Google Drive connection failed — try again');
+    }
+  } catch(e){
+    showToast('Google Drive connection failed — try again');
+  }
+}
+
 function invoiceDate(){
   var d = new Date();
   var dd = String(d.getDate()).padStart(2,'0');
@@ -1160,6 +1260,8 @@ function onLoggedIn(){
       if(openId && jobs.find(function(x){ return x.id===openId; })){
         openJob(openId);
       }
+      handleGoogleCallback();
+      checkGoogleDriveStatus();
     });
   });
 }

@@ -25,7 +25,7 @@ const ALLOWED_ORIGINS = [
 function corsHeaders(origin) {
   const isAllowed = ALLOWED_ORIGINS.includes(origin);
   const headers = {
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-PDF-Secret, Authorization",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
@@ -43,6 +43,37 @@ function jsonError(status, message, origin) {
 
 function safeFilename(name) {
   return (name || "report.pdf").replace(/[^\w.\-]/g, "_").slice(0, 120);
+}
+
+// Exchanges the user's stored Google refresh token for a fresh access token.
+// Throws if no refresh token is stored or the refresh call fails — callers
+// should surface "reconnect Google Drive" to the user on either case.
+async function getGoogleAccessToken(userId, env) {
+  if (!userId) throw new Error("Missing userId");
+  if (!env.TRADE_REPORTA_KV) throw new Error("KV namespace not bound");
+  const refreshToken = await env.TRADE_REPORTA_KV.get("gdrive_" + userId);
+  if (!refreshToken) throw new Error("No refresh token found for user");
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+    throw new Error("Google OAuth not configured");
+  }
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }).toString(),
+  });
+  if (!r.ok) {
+    let detail = "";
+    try { detail = await r.text(); } catch {}
+    throw new Error(`Token refresh failed: ${r.status} ${detail.slice(0, 200)}`);
+  }
+  const data = await r.json();
+  if (!data || !data.access_token) throw new Error("No access_token in refresh response");
+  return data.access_token;
 }
 
 export default {
@@ -89,6 +120,11 @@ export default {
         console.warn(`[${reqId}] Supabase verify failed status=${verify.status}`);
         return jsonError(401, "Unauthorized", origin);
       }
+      let userId = null;
+      try {
+        const verifiedUser = await verify.json();
+        userId = verifiedUser && verifiedUser.id;
+      } catch (e) { /* userId stays null; downstream routes that need it will 401 */ }
 
       // /api/ai — Anthropic Claude proxy
       if (url.pathname === "/api/ai" && request.method === "POST") {
@@ -150,6 +186,70 @@ export default {
         const data = await upstream.json();
         return new Response(JSON.stringify(data), {
           status: upstream.status,
+          headers: { "Content-Type": "application/json", ...baseHeaders }
+        });
+      }
+
+      // /api/google-auth — exchange Google OAuth code for tokens, store refresh token in KV
+      if (url.pathname === "/api/google-auth" && request.method === "POST") {
+        if (!userId) return jsonError(401, "Unauthorized", origin);
+        if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REDIRECT_URI) {
+          console.error(`[${reqId}] Google OAuth secrets missing`);
+          return jsonError(500, "Google OAuth not configured", origin);
+        }
+        let body;
+        try {
+          body = await request.json();
+        } catch (e) {
+          return jsonError(400, "Invalid JSON", origin);
+        }
+        if (!body || !body.code) return jsonError(400, "Missing code", origin);
+        let tokenRes;
+        try {
+          tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              code: body.code,
+              client_id: env.GOOGLE_CLIENT_ID,
+              client_secret: env.GOOGLE_CLIENT_SECRET,
+              redirect_uri: env.GOOGLE_REDIRECT_URI,
+              grant_type: "authorization_code",
+            }).toString(),
+          });
+        } catch (e) {
+          console.error(`[${reqId}] Google token fetch threw: ${e && e.message}`);
+          return jsonError(502, "Token exchange failed", origin);
+        }
+        let tokens;
+        try {
+          tokens = await tokenRes.json();
+        } catch (e) {
+          return jsonError(502, "Token exchange returned non-JSON", origin);
+        }
+        if (!tokenRes.ok) {
+          console.error(`[${reqId}] Google token exchange ${tokenRes.status}: ${tokens && (tokens.error_description || tokens.error)}`);
+          return new Response(JSON.stringify({ error: tokens.error || "Token exchange failed", details: tokens.error_description || null }), {
+            status: tokenRes.status,
+            headers: { "Content-Type": "application/json", ...baseHeaders }
+          });
+        }
+        if (!tokens.refresh_token) {
+          return jsonError(401, "No refresh token returned", origin);
+        }
+        await env.TRADE_REPORTA_KV.put("gdrive_" + userId, tokens.refresh_token);
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...baseHeaders }
+        });
+      }
+
+      // /api/google-status — does the current user have a stored refresh token?
+      if (url.pathname === "/api/google-status" && request.method === "GET") {
+        if (!userId) return jsonError(401, "Unauthorized", origin);
+        const existing = await env.TRADE_REPORTA_KV.get("gdrive_" + userId);
+        return new Response(JSON.stringify({ connected: !!existing }), {
+          status: 200,
           headers: { "Content-Type": "application/json", ...baseHeaders }
         });
       }

@@ -3,6 +3,11 @@ main = "src/index.js"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 
+[[kv_namespaces]]
+binding = "TRADE_REPORTA_KV"
+id = "e999c4f105ad4fdcac65122f115a5bc6"
+preview_id = "436b22a334194badb4ec2dea669cd200"
+
 # Required secrets (set with `wrangler secret put`, never commit real values):
 #   wrangler secret put PDF_SECRET         — shared X-PDF-Secret header value (PDF route auth)
 #   wrangler secret put CF_ACCOUNT_ID      — Cloudflare account ID
