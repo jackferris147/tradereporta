@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Trade Reporta</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{--orange:#E8763A;--charcoal:#1C1A18;--surface:#FFFFFF;--offwhite:#1C1A18;--muted:#6B7280;--deep:#F9FAFB;--ink:#1C1A18;--border:#E5E7EB;--border-light:#F3F4F6;--orange-dim:rgba(232,118,58,0.08);--green:#16A34A;--red:#DC2626;--shadow-sm:0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);--shadow-md:0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -2330,27 +2331,45 @@ async function getPhotosForJob(jobId){
 }
 
 // Core: compress photos, attach cached PDF if it matches the job, POST to /api/drive-upload.
+function showExportProgress(label, sub, pct){
+  var el = document.getElementById('export-progress');
+  if(!el) return;
+  el.style.display = 'flex';
+  var lbl = document.getElementById('export-progress-label');
+  var subEl = document.getElementById('export-progress-sub');
+  var bar = document.getElementById('export-progress-bar');
+  if(lbl) lbl.textContent = label;
+  if(subEl) subEl.textContent = sub || '';
+  if(bar) bar.style.width = (pct || 0) + '%';
+}
+function hideExportProgress(){
+  var el = document.getElementById('export-progress');
+  if(el) el.style.display = 'none';
+}
+function showGdriveNotConnectedPrompt(){
+  var el = document.getElementById('gdrive-prompt');
+  if(el) el.style.display = 'flex';
+}
+
+// Compresses photos, builds the files[] payload, posts to /api/drive-upload.
+// Returns { success, folderUrl } | { error: 'not_connected'|'token_expired'|'upload_failed'|'no_files'|'network_failed', message? }
 async function uploadJobPackToDrive(opts){
   var validPhotos = (opts.photos||[]).filter(function(p){ return p && p.url; });
   var pdfBlob = opts.pdfBlob || null;
-  if(!validPhotos.length && !pdfBlob){
-    showToast('No photos to export');
-    return { skipped: true };
-  }
+  if(!validPhotos.length && !pdfBlob) return { error: 'no_files' };
   var folderName = sanitizeFileSegment(opts.ref || opts.jobId || 'Job');
   if(opts.address){
     var addr = sanitizeFileSegment(opts.address);
     if(addr) folderName += ' — ' + addr;
   }
-  showToast('Compressing photos...');
   var files = [];
   for(var i = 0; i < validPhotos.length; i++){
-    var p = validPhotos[i];
+    if(opts.onPhotoProgress) opts.onPhotoProgress(i, validPhotos.length);
     try {
-      var data = await compressPhotoForExport(p.url);
+      var data = await compressPhotoForExport(validPhotos[i].url);
       var seq = String(i + 1);
       if(seq.length < 2) seq = '0' + seq;
-      var cap = sanitizeFileSegment(p.cap || p.caption);
+      var cap = sanitizeFileSegment(validPhotos[i].cap || validPhotos[i].caption);
       var name = seq + (cap ? ' — ' + cap : '') + '.jpg';
       files.push({ name: name, data: data, mimeType: 'image/jpeg' });
     } catch(e){
@@ -2361,39 +2380,53 @@ async function uploadJobPackToDrive(opts){
     try {
       var pdfDataUrl = await blobToBase64(pdfBlob);
       var idx = pdfDataUrl.indexOf(',');
-      if(idx >= 0){
-        files.push({ name: 'Report.pdf', data: pdfDataUrl.slice(idx + 1), mimeType: 'application/pdf' });
-      }
+      if(idx >= 0) files.push({ name: 'Report.pdf', data: pdfDataUrl.slice(idx + 1), mimeType: 'application/pdf' });
     } catch(e){
       console.error('[export] PDF base64 failed:', e && e.message);
     }
   }
-  if(!files.length){
-    showToast('No files to upload');
-    return { skipped: true };
-  }
+  if(!files.length) return { error: 'no_files' };
+  if(opts.onUploadStart) opts.onUploadStart();
   var sess = await supa.auth.getSession();
   var token = (sess && sess.data && sess.data.session && sess.data.session.access_token) || '';
-  showToast('Uploading to Google Drive...');
-  var r = await fetch(WORKER + '/api/drive-upload', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ files: files, folderName: folderName })
-  });
+  var r;
+  try {
+    r = await fetch(WORKER + '/api/drive-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ files: files, folderName: folderName })
+    });
+  } catch(e){
+    return { error: 'network_failed', message: e && e.message };
+  }
+  if(opts.onUploadEnd) opts.onUploadEnd();
   var data;
   try { data = await r.json(); } catch(e){ data = null; }
   if(r.ok && data && data.success){
-    showToast('Saved to Google Drive ✓');
-    if(data.folderUrl) window.open(data.folderUrl, '_blank');
     return { success: true, folderUrl: data.folderUrl };
   }
-  if(r.status === 403 || (data && data.error && /not connected/i.test(data.error))){
-    showToast('Connect Google Drive in Settings first');
+  var errCode = data && data.error;
+  if(errCode === 'not_connected') return { error: 'not_connected' };
+  if(errCode === 'token_expired') return { error: 'token_expired' };
+  return { error: 'upload_failed', message: (data && data.message) || ('HTTP ' + r.status) };
+}
+
+function handleDriveResult(result){
+  if(result && result.success){
+    showToast('Saved to Google Drive ✓');
+    if(result.folderUrl) window.open(result.folderUrl, '_blank');
+    return;
+  }
+  var err = result && result.error;
+  if(err === 'no_files'){ showToast('No files to export'); return; }
+  if(err === 'not_connected'){ showGdriveNotConnectedPrompt(); return; }
+  if(err === 'token_expired'){
+    showToast('Google Drive disconnected — reconnect in Settings');
+    checkGoogleDriveStatus();
     goView('settings');
-    return { notConnected: true };
+    return;
   }
   showToast('Upload failed — try again');
-  return { error: true };
 }
 
 async function exportJobPack(){
@@ -2401,41 +2434,116 @@ async function exportJobPack(){
   if(!btn || btn.disabled) return;
   btn.disabled = true;
   btn.textContent = 'Uploading...';
+  showExportProgress('Preparing job pack', '', 0);
   try {
     var job = jobs.find(function(x){ return x.id === cid; });
     var photosSrc = await getPhotosForJob(cid);
-    await uploadJobPackToDrive({
+    var validCount = (photosSrc||[]).filter(function(p){ return p && p.url; }).length;
+    var result = await uploadJobPackToDrive({
       jobId: cid,
       ref: g('f-ref') || (job && job.ref),
       address: g('f-address') || (job && job.address),
       photos: photosSrc,
-      pdfBlob: (pdfBlobCache.jobId === cid ? pdfBlobCache.blob : null)
+      pdfBlob: (pdfBlobCache.jobId === cid ? pdfBlobCache.blob : null),
+      onPhotoProgress: function(i, total){
+        var pct = total ? Math.round(((i+1) / total) * 60) : 0;
+        showExportProgress('Compressing photos', 'Photo ' + (i+1) + ' of ' + total, pct);
+      },
+      onUploadStart: function(){
+        showExportProgress('Uploading to Google Drive', 'Almost done...', 80);
+      },
+      onUploadEnd: function(){
+        showExportProgress('Saving to Drive', 'Finishing up...', 95);
+      }
     });
+    handleDriveResult(result);
   } catch(e){
     console.error('[export] failed:', e && e.message);
     showToast('Export failed — try again');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Export Pack';
+    hideExportProgress();
   }
 }
 
 async function exportJobPackFor(jobId){
   var j = jobs.find(function(x){ return x.id === jobId; });
   if(!j){ showToast('Job not found'); return; }
-  showToast('Loading photos...');
+  showExportProgress('Preparing job pack', '', 0);
   try {
     var photosSrc = await getPhotosForJob(jobId);
-    await uploadJobPackToDrive({
+    var result = await uploadJobPackToDrive({
       jobId: jobId,
       ref: j.ref,
       address: j.address,
       photos: photosSrc,
-      pdfBlob: (pdfBlobCache.jobId === jobId ? pdfBlobCache.blob : null)
+      pdfBlob: (pdfBlobCache.jobId === jobId ? pdfBlobCache.blob : null),
+      onPhotoProgress: function(i, total){
+        var pct = total ? Math.round(((i+1) / total) * 60) : 0;
+        showExportProgress('Compressing photos', 'Photo ' + (i+1) + ' of ' + total, pct);
+      },
+      onUploadStart: function(){
+        showExportProgress('Uploading to Google Drive', 'Almost done...', 80);
+      },
+      onUploadEnd: function(){
+        showExportProgress('Saving to Drive', 'Finishing up...', 95);
+      }
     });
+    handleDriveResult(result);
   } catch(e){
     console.error('[export] failed:', e && e.message);
     showToast('Export failed — try again');
+  } finally {
+    hideExportProgress();
+  }
+}
+
+// Local zip fallback offered when Google Drive isn't connected.
+async function exportJobPackZip(){
+  if(typeof JSZip === 'undefined'){ showToast('Zip library still loading'); return; }
+  showExportProgress('Preparing zip', '', 0);
+  try {
+    var job = jobs.find(function(x){ return x.id === cid; });
+    var photosSrc = await getPhotosForJob(cid);
+    var validPhotos = (photosSrc||[]).filter(function(p){ return p && p.url; });
+    var pdfBlob = (pdfBlobCache.jobId === cid ? pdfBlobCache.blob : null);
+    if(!validPhotos.length && !pdfBlob){
+      showToast('No photos to export');
+      return;
+    }
+    var client = sanitizeFileSegment(g('f-client') || (job && job.client)) || 'Job';
+    var address = sanitizeFileSegment(g('f-address') || (job && job.address)) || 'Untitled';
+    var zipName = client + ' — ' + address + '.zip';
+    var zip = new JSZip();
+    var photosFolder = zip.folder('Photos');
+    for(var i = 0; i < validPhotos.length; i++){
+      showExportProgress('Compressing photos', 'Photo ' + (i+1) + ' of ' + validPhotos.length, Math.round(((i+1) / validPhotos.length) * 80));
+      try {
+        var b64 = await compressPhotoForExport(validPhotos[i].url);
+        var seq = String(i+1);
+        if(seq.length < 2) seq = '0' + seq;
+        var cap = sanitizeFileSegment(validPhotos[i].cap || validPhotos[i].caption);
+        var fname = seq + (cap ? ' — ' + cap : '') + '.jpg';
+        photosFolder.file(fname, b64, { base64: true });
+      } catch(e){
+        console.error('[zip] photo', i+1, 'failed:', e && e.message);
+      }
+    }
+    if(pdfBlob) zip.file('Report.pdf', pdfBlob);
+    showExportProgress('Building zip', 'Almost done...', 90);
+    var zipBlob = await zip.generateAsync({ type: 'blob' });
+    var url = URL.createObjectURL(zipBlob);
+    var a = document.createElement('a');
+    a.href = url; a.download = zipName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+    showToast('Zip downloaded — check Downloads');
+  } catch(e){
+    console.error('[zip] failed:', e && e.message);
+    showToast('Zip download failed');
+  } finally {
+    hideExportProgress();
   }
 }
 
@@ -2855,5 +2963,26 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
 }
 
 </script>
+
+<div id="gdrive-prompt" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:320px;margin:20px;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:#1C1A18;margin-bottom:8px">Google Drive not connected</div>
+    <div style="font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:20px">Connect Google Drive to save job packs automatically, or download a zip file instead.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="pbtn" style="width:100%" onclick="document.getElementById('gdrive-prompt').style.display='none';goView('settings')">Connect Google Drive</button>
+      <button class="sbtn" style="width:100%" onclick="document.getElementById('gdrive-prompt').style.display='none';exportJobPackZip()">Download as ZIP instead</button>
+      <button style="background:none;border:none;color:#9CA3AF;font-size:13px;cursor:pointer;padding:4px" onclick="document.getElementById('gdrive-prompt').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="export-progress" style="display:none;position:fixed;inset:0;background:rgba(255,255,255,0.92);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div id="export-progress-label" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:1px;text-transform:uppercase;color:#1C1A18">Compressing photos...</div>
+  <div style="width:260px;height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden">
+    <div id="export-progress-bar" style="height:100%;background:#E8763A;border-radius:2px;width:0%;transition:width 0.3s ease"></div>
+  </div>
+  <div id="export-progress-sub" style="font-size:12px;color:#9CA3AF">Preparing...</div>
+</div>
+
 </body>
 </html>

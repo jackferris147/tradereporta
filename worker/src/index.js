@@ -46,13 +46,14 @@ function safeFilename(name) {
 }
 
 // Exchanges the user's stored Google refresh token for a fresh access token.
-// Throws if no refresh token is stored or the refresh call fails — callers
-// should surface "reconnect Google Drive" to the user on either case.
+// Throws sentinel error messages the route handlers translate into structured
+// JSON: 'GDRIVE_NOT_CONNECTED' (no token in KV) and 'GDRIVE_TOKEN_EXPIRED'
+// (Google returned invalid_grant or similar; the stale token is purged).
 async function getGoogleAccessToken(userId, env) {
   if (!userId) throw new Error("Missing userId");
   if (!env.TRADE_REPORTA_KV) throw new Error("KV namespace not bound");
   const refreshToken = await env.TRADE_REPORTA_KV.get("gdrive_" + userId);
-  if (!refreshToken) throw new Error("No refresh token found for user");
+  if (!refreshToken) throw new Error("GDRIVE_NOT_CONNECTED");
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
     throw new Error("Google OAuth not configured");
   }
@@ -69,6 +70,12 @@ async function getGoogleAccessToken(userId, env) {
   if (!r.ok) {
     let detail = "";
     try { detail = await r.text(); } catch {}
+    // invalid_grant / unauthorized_client both mean the refresh token is dead.
+    // Wipe KV so /api/google-status reflects reality, then surface the sentinel.
+    if (/invalid_grant|unauthorized_client|invalid_client/i.test(detail)) {
+      try { await env.TRADE_REPORTA_KV.delete("gdrive_" + userId); } catch {}
+      throw new Error("GDRIVE_TOKEN_EXPIRED");
+    }
     throw new Error(`Token refresh failed: ${r.status} ${detail.slice(0, 200)}`);
   }
   const data = await r.json();
@@ -85,8 +92,13 @@ function driveQuote(s) {
 // to drive.file so it only finds folders this app has created — which is exactly
 // what we want for idempotent "Trade Reporta/<job>" structure.
 async function findOrCreateFolder(accessToken, name, parentId) {
-  let query = `mimeType='application/vnd.google-apps.folder' and name='${driveQuote(name)}' and trashed=false`;
-  if (parentId) query += ` and '${driveQuote(parentId)}' in parents`;
+  // Scope every search to a specific parent — including 'root' for the top-level
+  // "Trade Reporta" folder — so we don't match a folder of the same name nested
+  // anywhere else in the user's Drive (which is what was creating duplicates).
+  const parentClause = parentId
+    ? `'${driveQuote(parentId)}' in parents`
+    : `'root' in parents`;
+  const query = `name='${driveQuote(name)}' and mimeType='application/vnd.google-apps.folder' and trashed=false and ${parentClause}`;
   const searchUrl = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(query) + "&fields=files(id)";
   const searchRes = await fetch(searchUrl, {
     headers: { "Authorization": "Bearer " + accessToken }
@@ -99,6 +111,9 @@ async function findOrCreateFolder(accessToken, name, parentId) {
   if (searchData.files && searchData.files.length > 0) {
     return searchData.files[0].id;
   }
+  // Short pause before create — gives Drive indexing a moment to settle and
+  // reduces the chance of two near-simultaneous calls each creating a duplicate.
+  await new Promise(r => setTimeout(r, 300));
   const meta = { name: name, mimeType: "application/vnd.google-apps.folder" };
   if (parentId) meta.parents = [parentId];
   const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
@@ -351,9 +366,24 @@ export default {
         try {
           accessToken = await getGoogleAccessToken(userId, env);
         } catch (e) {
-          console.warn(`[${reqId}] /api/drive-upload no access token: ${e && e.message}`);
-          return new Response(JSON.stringify({ error: "Google Drive not connected. Please connect in Settings." }), {
-            status: 403,
+          const msg = (e && e.message) || "";
+          if (msg === "GDRIVE_NOT_CONNECTED") {
+            console.warn(`[${reqId}] /api/drive-upload not_connected for user ${userId}`);
+            return new Response(JSON.stringify({ error: "not_connected" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json", ...baseHeaders }
+            });
+          }
+          if (msg === "GDRIVE_TOKEN_EXPIRED") {
+            console.warn(`[${reqId}] /api/drive-upload token_expired for user ${userId} — KV entry purged`);
+            return new Response(JSON.stringify({ error: "token_expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json", ...baseHeaders }
+            });
+          }
+          console.error(`[${reqId}] /api/drive-upload token error: ${msg}`);
+          return new Response(JSON.stringify({ error: "upload_failed", message: msg }), {
+            status: 502,
             headers: { "Content-Type": "application/json", ...baseHeaders }
           });
         }
@@ -395,8 +425,12 @@ export default {
             headers: { "Content-Type": "application/json", ...baseHeaders }
           });
         } catch (e) {
-          console.error(`[${reqId}] /api/drive-upload failed: ${e && e.message}`);
-          return jsonError(502, "Drive upload failed: " + (e && e.message ? e.message : "unknown"), origin);
+          const msg = (e && e.message) || "unknown";
+          console.error(`[${reqId}] /api/drive-upload failed: ${msg}`);
+          return new Response(JSON.stringify({ error: "upload_failed", message: msg }), {
+            status: 502,
+            headers: { "Content-Type": "application/json", ...baseHeaders }
+          });
         }
       }
 
