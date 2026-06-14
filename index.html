@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Trade Reporta</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{--orange:#E8763A;--charcoal:#1C1A18;--surface:#FFFFFF;--offwhite:#1C1A18;--muted:#6B7280;--deep:#F9FAFB;--ink:#1C1A18;--border:#E5E7EB;--border-light:#F3F4F6;--orange-dim:rgba(232,118,58,0.08);--green:#16A34A;--red:#DC2626;--shadow-sm:0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);--shadow-md:0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -2285,6 +2284,7 @@ function sanitizeFileSegment(s){
   return (s||'').replace(/[\/\\?%*:|"<>]/g,'').replace(/\s+/g,' ').trim();
 }
 
+// Returns raw base64 (no data: prefix) of a resized JPEG, max 1920px on the long side.
 function compressPhotoForExport(dataUrl){
   return new Promise(function(resolve, reject){
     if(!dataUrl){ reject(new Error('no data url')); return; }
@@ -2299,10 +2299,10 @@ function compressPhotoForExport(dataUrl){
       canvas.width = w; canvas.height = h;
       try {
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        canvas.toBlob(function(blob){
-          if(!blob){ reject(new Error('toBlob failed')); return; }
-          resolve(blob);
-        }, 'image/jpeg', 0.8);
+        var url = canvas.toDataURL('image/jpeg', 0.8);
+        var idx = url.indexOf(',');
+        if(idx < 0){ reject(new Error('bad dataURL')); return; }
+        resolve(url.slice(idx + 1));
       } catch(e){ reject(e); }
     };
     img.onerror = function(){ reject(new Error('image decode failed')); };
@@ -2310,75 +2310,133 @@ function compressPhotoForExport(dataUrl){
   });
 }
 
-function runExportPack(opts){
-  if(typeof JSZip === 'undefined'){ showToast('Zip library still loading'); return Promise.resolve(); }
+function blobToBase64(blob){
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(){ resolve(reader.result); };
+    reader.onerror = function(){ reject(new Error('FileReader failed')); };
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getPhotosForJob(jobId){
+  if(cid === jobId && photos && photos.length){
+    return photos;
+  }
+  var arr = await idbGet(jobId);
+  if(arr && arr.length) return arr;
+  var j = jobs.find(function(x){ return x.id === jobId; });
+  return (j && j.photos) || [];
+}
+
+// Core: compress photos, attach cached PDF if it matches the job, POST to /api/drive-upload.
+async function uploadJobPackToDrive(opts){
   var validPhotos = (opts.photos||[]).filter(function(p){ return p && p.url; });
-  if(!validPhotos.length){ showToast('No photos to export'); return Promise.resolve(); }
+  var pdfBlob = opts.pdfBlob || null;
+  if(!validPhotos.length && !pdfBlob){
+    showToast('No photos to export');
+    return { skipped: true };
+  }
+  var folderName = sanitizeFileSegment(opts.ref || opts.jobId || 'Job');
+  if(opts.address){
+    var addr = sanitizeFileSegment(opts.address);
+    if(addr) folderName += ' — ' + addr;
+  }
   showToast('Compressing photos...');
-  var client = sanitizeFileSegment(opts.client) || 'Job';
-  var address = sanitizeFileSegment(opts.address) || 'Untitled';
-  var zipName = client + ' — ' + address + '.zip';
-  var hasPdf = !!opts.pdfBlob;
-  var zip = new JSZip();
-  var photosFolder = zip.folder('Photos');
-  return Promise.all(validPhotos.map(function(p, i){
-    return compressPhotoForExport(p.url).then(function(blob){
-      var seq = String(i+1);
+  var files = [];
+  for(var i = 0; i < validPhotos.length; i++){
+    var p = validPhotos[i];
+    try {
+      var data = await compressPhotoForExport(p.url);
+      var seq = String(i + 1);
       if(seq.length < 2) seq = '0' + seq;
-      var name = seq;
-      var cap = sanitizeFileSegment(p.cap);
-      if(cap) name += ' — ' + cap;
-      name += '.jpg';
-      photosFolder.file(name, blob);
-    }).catch(function(e){
-      console.error('[export] photo', i+1, 'failed:', e && e.message);
-    });
-  })).then(function(){
-    if(hasPdf) zip.file('Report.pdf', opts.pdfBlob);
-    return zip.generateAsync({ type: 'blob' });
-  }).then(function(zipBlob){
-    var url = URL.createObjectURL(zipBlob);
-    var a = document.createElement('a');
-    a.href = url; a.download = zipName;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
-    if(hasPdf) showToast('Job pack ready — check Downloads');
-    else showToast('Photos exported — generate PDF first to include it');
-  }).catch(function(e){
-    console.error('[export] zip failed:', e && e.message);
-    showToast('Export failed — try again');
+      var cap = sanitizeFileSegment(p.cap || p.caption);
+      var name = seq + (cap ? ' — ' + cap : '') + '.jpg';
+      files.push({ name: name, data: data, mimeType: 'image/jpeg' });
+    } catch(e){
+      console.error('[export] photo', i+1, 'compression failed:', e && e.message);
+    }
+  }
+  if(pdfBlob){
+    try {
+      var pdfDataUrl = await blobToBase64(pdfBlob);
+      var idx = pdfDataUrl.indexOf(',');
+      if(idx >= 0){
+        files.push({ name: 'Report.pdf', data: pdfDataUrl.slice(idx + 1), mimeType: 'application/pdf' });
+      }
+    } catch(e){
+      console.error('[export] PDF base64 failed:', e && e.message);
+    }
+  }
+  if(!files.length){
+    showToast('No files to upload');
+    return { skipped: true };
+  }
+  var sess = await supa.auth.getSession();
+  var token = (sess && sess.data && sess.data.session && sess.data.session.access_token) || '';
+  showToast('Uploading to Google Drive...');
+  var r = await fetch(WORKER + '/api/drive-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ files: files, folderName: folderName })
   });
+  var data;
+  try { data = await r.json(); } catch(e){ data = null; }
+  if(r.ok && data && data.success){
+    showToast('Saved to Google Drive ✓');
+    if(data.folderUrl) window.open(data.folderUrl, '_blank');
+    return { success: true, folderUrl: data.folderUrl };
+  }
+  if(r.status === 403 || (data && data.error && /not connected/i.test(data.error))){
+    showToast('Connect Google Drive in Settings first');
+    goView('settings');
+    return { notConnected: true };
+  }
+  showToast('Upload failed — try again');
+  return { error: true };
 }
 
-function exportJobPack(){
-  var validPhotos = (photos||[]).filter(function(p){ return p && p.url; });
-  if(!validPhotos.length){ showToast('Add photos before exporting'); return; }
+async function exportJobPack(){
   var btn = document.getElementById('export-btn');
-  var origLabel = btn ? btn.textContent : 'Export Pack';
-  if(btn){ btn.disabled = true; btn.textContent = 'Preparing...'; }
-  runExportPack({
-    client: g('f-client'),
-    address: g('f-address'),
-    photos: photos,
-    pdfBlob: (pdfBlobCache.jobId === cid ? pdfBlobCache.blob : null)
-  }).then(function(){
-    if(btn){ btn.disabled = false; btn.textContent = origLabel; }
-  });
+  if(!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Uploading...';
+  try {
+    var job = jobs.find(function(x){ return x.id === cid; });
+    var photosSrc = await getPhotosForJob(cid);
+    await uploadJobPackToDrive({
+      jobId: cid,
+      ref: g('f-ref') || (job && job.ref),
+      address: g('f-address') || (job && job.address),
+      photos: photosSrc,
+      pdfBlob: (pdfBlobCache.jobId === cid ? pdfBlobCache.blob : null)
+    });
+  } catch(e){
+    console.error('[export] failed:', e && e.message);
+    showToast('Export failed — try again');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Export Pack';
+  }
 }
 
-function exportJobPackFor(jobId){
+async function exportJobPackFor(jobId){
   var j = jobs.find(function(x){ return x.id === jobId; });
   if(!j){ showToast('Job not found'); return; }
   showToast('Loading photos...');
-  idbGet(jobId).then(function(arr){
-    var src = (arr && arr.length) ? arr : (j.photos || []);
-    return runExportPack({
-      client: j.client,
+  try {
+    var photosSrc = await getPhotosForJob(jobId);
+    await uploadJobPackToDrive({
+      jobId: jobId,
+      ref: j.ref,
       address: j.address,
-      photos: src,
+      photos: photosSrc,
       pdfBlob: (pdfBlobCache.jobId === jobId ? pdfBlobCache.blob : null)
     });
-  });
+  } catch(e){
+    console.error('[export] failed:', e && e.message);
+    showToast('Export failed — try again');
+  }
 }
 
 async function finaliseInvoiceQuick(id){

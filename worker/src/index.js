@@ -76,6 +76,82 @@ async function getGoogleAccessToken(userId, env) {
   return data.access_token;
 }
 
+// Escapes single quotes in Drive query string literals.
+function driveQuote(s) {
+  return String(s || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+// Returns the Drive folder ID, creating it if it does not exist. Search is scoped
+// to drive.file so it only finds folders this app has created — which is exactly
+// what we want for idempotent "Trade Reporta/<job>" structure.
+async function findOrCreateFolder(accessToken, name, parentId) {
+  let query = `mimeType='application/vnd.google-apps.folder' and name='${driveQuote(name)}' and trashed=false`;
+  if (parentId) query += ` and '${driveQuote(parentId)}' in parents`;
+  const searchUrl = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(query) + "&fields=files(id)";
+  const searchRes = await fetch(searchUrl, {
+    headers: { "Authorization": "Bearer " + accessToken }
+  });
+  if (!searchRes.ok) {
+    const detail = await searchRes.text();
+    throw new Error(`Drive search failed (${searchRes.status}): ${detail.slice(0, 200)}`);
+  }
+  const searchData = await searchRes.json();
+  if (searchData.files && searchData.files.length > 0) {
+    return searchData.files[0].id;
+  }
+  const meta = { name: name, mimeType: "application/vnd.google-apps.folder" };
+  if (parentId) meta.parents = [parentId];
+  const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + accessToken,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(meta)
+  });
+  if (!createRes.ok) {
+    const detail = await createRes.text();
+    throw new Error(`Drive folder create failed (${createRes.status}): ${detail.slice(0, 200)}`);
+  }
+  const createData = await createRes.json();
+  return createData.id;
+}
+
+// Uploads a single binary file to Drive under parentFolderId using multipart/related.
+// `file.data` is base64 (no data: prefix); we decode it to bytes and build the body
+// as a Uint8Array so binary content survives intact (string concat would coerce).
+async function uploadFileToDrive(accessToken, file, parentFolderId) {
+  const boundary = "trbnd_" + Math.random().toString(16).slice(2);
+  const fileBytes = Uint8Array.from(atob(file.data), c => c.charCodeAt(0));
+  const metadata = { name: file.name, parents: [parentFolderId] };
+  const encoder = new TextEncoder();
+  const header = encoder.encode(
+    `--${boundary}\r\n` +
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify(metadata) + `\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Type: ${file.mimeType}\r\n\r\n`
+  );
+  const footer = encoder.encode(`\r\n--${boundary}--`);
+  const body = new Uint8Array(header.length + fileBytes.length + footer.length);
+  body.set(header, 0);
+  body.set(fileBytes, header.length);
+  body.set(footer, header.length + fileBytes.length);
+  const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + accessToken,
+      "Content-Type": `multipart/related; boundary=${boundary}`
+    },
+    body: body
+  });
+  if (!r.ok) {
+    const detail = await r.text();
+    throw new Error(`Drive upload failed (${r.status}): ${detail.slice(0, 200)}`);
+  }
+  return await r.json();
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
@@ -265,6 +341,63 @@ export default {
           status: 200,
           headers: { "Content-Type": "application/json", ...baseHeaders }
         });
+      }
+
+      // /api/drive-upload — push a job pack (photos + optional PDF) to Drive under
+      // Trade Reporta/<folderName>. Body: { files:[{name,data(base64),mimeType}], folderName }
+      if (url.pathname === "/api/drive-upload" && request.method === "POST") {
+        if (!userId) return jsonError(401, "Unauthorized", origin);
+        let accessToken;
+        try {
+          accessToken = await getGoogleAccessToken(userId, env);
+        } catch (e) {
+          console.warn(`[${reqId}] /api/drive-upload no access token: ${e && e.message}`);
+          return new Response(JSON.stringify({ error: "Google Drive not connected. Please connect in Settings." }), {
+            status: 403,
+            headers: { "Content-Type": "application/json", ...baseHeaders }
+          });
+        }
+        let body;
+        try {
+          body = await request.json();
+        } catch (e) {
+          return jsonError(400, "Invalid JSON", origin);
+        }
+        const files = Array.isArray(body && body.files) ? body.files : [];
+        const folderName = (body && typeof body.folderName === "string" && body.folderName.trim()) || "";
+        if (!folderName) return jsonError(400, "Missing folderName", origin);
+        if (!files.length) return jsonError(400, "No files supplied", origin);
+        console.log(`[${reqId}] /api/drive-upload folder="${folderName}" fileCount=${files.length}`);
+        try {
+          const rootFolderId = await findOrCreateFolder(accessToken, "Trade Reporta", null);
+          const jobFolderId = await findOrCreateFolder(accessToken, folderName, rootFolderId);
+          const uploaded = [];
+          for (const file of files) {
+            if (!file || typeof file.data !== "string" || !file.name || !file.mimeType) {
+              console.warn(`[${reqId}] /api/drive-upload skipping malformed file entry`);
+              continue;
+            }
+            const meta = await uploadFileToDrive(accessToken, file, jobFolderId);
+            uploaded.push(meta.name || file.name);
+          }
+          const folderMetaRes = await fetch(
+            "https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(jobFolderId) + "?fields=webViewLink",
+            { headers: { "Authorization": "Bearer " + accessToken } }
+          );
+          let folderUrl = null;
+          if (folderMetaRes.ok) {
+            const folderMeta = await folderMetaRes.json();
+            folderUrl = folderMeta.webViewLink || null;
+          }
+          console.log(`[${reqId}] /api/drive-upload uploaded=${uploaded.length} folder="${folderName}"`);
+          return new Response(JSON.stringify({ success: true, uploaded: uploaded, folderUrl: folderUrl }), {
+            status: 200,
+            headers: { "Content-Type": "application/json", ...baseHeaders }
+          });
+        } catch (e) {
+          console.error(`[${reqId}] /api/drive-upload failed: ${e && e.message}`);
+          return jsonError(502, "Drive upload failed: " + (e && e.message ? e.message : "unknown"), origin);
+        }
       }
 
       return jsonError(404, "Not found", origin);
