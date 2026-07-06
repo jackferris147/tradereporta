@@ -224,6 +224,36 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .auth-btns .pbtn,.auth-btns .sbtn{flex:1;padding:10px 14px;font-size:14px}
 .account-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .account-email{font-size:13px;color:#7A7570;word-break:break-all;flex:1}
+.pi-group{margin-bottom:18px}
+.pi-group:last-child{margin-bottom:0}
+.pi-label{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#6B7280;margin-bottom:8px}
+.pi-options{display:flex;flex-wrap:wrap;gap:6px}
+.pi-btn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.3px;padding:8px 14px;border-radius:6px;border:1.5px solid #E5E7EB;background:#FFFFFF;color:#374151;cursor:pointer;transition:all 0.12s;-webkit-tap-highlight-color:transparent}
+.pi-btn:hover{border-color:#E8763A;color:#E8763A}
+.pi-btn.selected{background:#E8763A;border-color:#E8763A;color:#FFFFFF}
+.pi-btn--green.selected{background:#16A34A;border-color:#16A34A;color:#FFFFFF}
+.pi-btn--amber.selected{background:#D97706;border-color:#D97706;color:#FFFFFF}
+.pi-btn--orange.selected{background:#E8763A;border-color:#E8763A;color:#FFFFFF}
+.pi-btn--red.selected{background:#DC2626;border-color:#DC2626;color:#FFFFFF}
+.cl-tabrow{display:flex;background:#F5F5F5;border-radius:8px;padding:3px;margin-bottom:14px}
+.cl-tabbtn{flex:1;background:none;border:none;color:#7A7570;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.5px;text-transform:uppercase;padding:7px 10px;border-radius:6px;cursor:pointer;transition:all 0.15s}
+.cl-tabbtn.on{background:#FFFFFF;color:#1C1A18;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.cl-pane{display:none}
+.cl-pane.on{display:block}
+.cl-group-lbl{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#6B7280;margin:6px 0 10px}
+.cl-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #EFEFEF;border-radius:6px;background:#FFFFFF;margin-bottom:6px;cursor:pointer;transition:all 0.12s;-webkit-tap-highlight-color:transparent}
+.cl-item:hover{border-color:#E8763A}
+.cl-item.checked{background:#F0FDF4;border-color:#16A34A}
+.cl-check{width:18px;height:18px;border-radius:4px;border:1.5px solid #D1D5DB;background:#FFFFFF;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;color:transparent;font-weight:700}
+.cl-item.checked .cl-check{background:#16A34A;border-color:#16A34A;color:#FFFFFF}
+.cl-text{font-family:'Barlow',sans-serif;font-size:13px;color:#1C1A18;line-height:1.4}
+.cl-item.checked .cl-text{color:#166534}
+.cl-gaps{display:none;background:#FEF9C3;border:1px solid #FDE68A;border-radius:8px;padding:12px 14px;margin-top:12px}
+.cl-gaps.on{display:block}
+.cl-gaps-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#92400E;margin-bottom:6px}
+.cl-gaps-body{font-family:'Barlow',sans-serif;font-size:13px;color:#78350F;line-height:1.5}
+.cl-gaps-body ul{margin:6px 0 0 18px}
+.cl-gaps-body li{margin-bottom:3px}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
@@ -465,6 +495,53 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
         <div class="frow c2">
           <div class="fld"><label>Method</label><input id="f-method" value="Walk Over - Internal &amp; External"></div>
           <div class="fld"><label>Roof Material</label><input id="f-roofmat" placeholder="e.g. Colorbond / Decromastic"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" id="sec-preinspect">
+      <div class="sechdr" onclick="toggleSec('sec-preinspect')">
+        <div class="sechdr-l">
+          <span class="sectitle">Pre-Inspection</span>
+          <span id="preinspect-progress" style="font-size:11px;color:#E8763A;font-family:'Barlow Condensed';font-weight:700;margin-left:8px">Not started</span>
+        </div>
+        <span class="secarr">&#8964;</span>
+      </div>
+      <div class="secbody" id="secbody-preinspect">
+        <div class="pi-group"><div class="pi-label">Roof Type</div><div class="pi-options" data-group="roofType"><button type="button" class="pi-btn" data-val="metal">Metal</button><button type="button" class="pi-btn" data-val="tile">Tile</button><button type="button" class="pi-btn" data-val="decramastic">Decramastic</button><button type="button" class="pi-btn" data-val="concrete-tile">Concrete Tile</button><button type="button" class="pi-btn" data-val="other">Other</button></div></div>
+        <div class="pi-group" id="pi-profile-group" style="display:none"><div class="pi-label">Profile</div><div class="pi-options" data-group="profile"><button type="button" class="pi-btn" data-val="corrugated">Corrugated</button><button type="button" class="pi-btn" data-val="trimdek">Trimdek</button><button type="button" class="pi-btn" data-val="kliplok">Kliplok</button><button type="button" class="pi-btn" data-val="custom-orb">Custom ORB</button><button type="button" class="pi-btn" data-val="spandek">Spandek</button><button type="button" class="pi-btn" data-val="other">Other</button></div></div>
+        <div class="pi-group" id="pi-tilebrand-group" style="display:none"><div class="pi-label">Tile Brand</div><div class="pi-options" data-group="tileBrand"><button type="button" class="pi-btn" data-val="bristile">Bristile</button><button type="button" class="pi-btn" data-val="monier">Monier</button><button type="button" class="pi-btn" data-val="boral">Boral</button><button type="button" class="pi-btn" data-val="unknown">Unknown</button><button type="button" class="pi-btn" data-val="other">Other</button></div></div>
+        <div class="pi-group"><div class="pi-label">Colour / Finish</div><div class="pi-options" data-group="roofColour"><button type="button" class="pi-btn" data-val="colorbond">Colorbond</button><button type="button" class="pi-btn" data-val="zincalume">Zincalume</button><button type="button" class="pi-btn" data-val="painted">Painted</button><button type="button" class="pi-btn" data-val="terracotta">Terracotta</button><button type="button" class="pi-btn" data-val="concrete">Concrete</button><button type="button" class="pi-btn" data-val="unknown">Unknown</button></div></div>
+        <div class="pi-group"><div class="pi-label">Roof Pitch</div><div class="pi-options" data-group="pitch"><button type="button" class="pi-btn" data-val="low">Low (0&ndash;10&deg;)</button><button type="button" class="pi-btn" data-val="medium">Medium (10&ndash;20&deg;)</button><button type="button" class="pi-btn" data-val="steep">Steep (20&deg;+)</button></div></div>
+        <div class="pi-group"><div class="pi-label">Storeys</div><div class="pi-options" data-group="storeys"><button type="button" class="pi-btn" data-val="single">Single</button><button type="button" class="pi-btn" data-val="double">Double</button><button type="button" class="pi-btn" data-val="multi">Multi</button></div></div>
+        <div class="pi-group"><div class="pi-label">Overall Condition</div><div class="pi-options" data-group="condition"><button type="button" class="pi-btn pi-btn--green" data-val="good">Good</button><button type="button" class="pi-btn pi-btn--amber" data-val="fair">Fair</button><button type="button" class="pi-btn pi-btn--orange" data-val="poor">Poor</button><button type="button" class="pi-btn pi-btn--red" data-val="storm-damaged">Storm Damaged</button><button type="button" class="pi-btn pi-btn--red" data-val="hail-damaged">Hail Damaged</button></div></div>
+        <div class="pi-group"><div class="pi-label">Approximate Age</div><div class="pi-options" data-group="roofAge"><button type="button" class="pi-btn" data-val="0-5">0&ndash;5 yrs</button><button type="button" class="pi-btn" data-val="5-10">5&ndash;10 yrs</button><button type="button" class="pi-btn" data-val="10-20">10&ndash;20 yrs</button><button type="button" class="pi-btn" data-val="20-30">20&ndash;30 yrs</button><button type="button" class="pi-btn" data-val="30+">30+ yrs</button><button type="button" class="pi-btn" data-val="unknown">Unknown</button></div></div>
+        <div class="pi-group"><div class="pi-label">Gutters</div><div class="pi-options" data-group="gutters"><button type="button" class="pi-btn pi-btn--green" data-val="good">Good</button><button type="button" class="pi-btn pi-btn--amber" data-val="fair">Fair</button><button type="button" class="pi-btn pi-btn--red" data-val="poor">Poor</button><button type="button" class="pi-btn" data-val="not-inspected">Not Inspected</button></div></div>
+        <div class="pi-group"><div class="pi-label">Site Hazards</div><div class="pi-options" data-group="hazards" data-multi="true"><button type="button" class="pi-btn" data-val="asbestos">Asbestos Risk</button><button type="button" class="pi-btn" data-val="steep-pitch">Steep Pitch</button><button type="button" class="pi-btn" data-val="fragile">Fragile Sheets</button><button type="button" class="pi-btn" data-val="powerlines">Powerlines</button><button type="button" class="pi-btn" data-val="height">Extreme Height</button><button type="button" class="pi-btn" data-val="none">None</button></div></div>
+        <div class="pi-group"><div class="pi-label">Roof Access</div><div class="pi-options" data-group="access"><button type="button" class="pi-btn" data-val="ladder">Ladder</button><button type="button" class="pi-btn" data-val="scaffolding">Scaffolding</button><button type="button" class="pi-btn" data-val="walkway">Walkway</button><button type="button" class="pi-btn" data-val="ewp">EWP</button><button type="button" class="pi-btn" data-val="no-access">No Access</button></div></div>
+        <div class="pi-group"><div class="pi-label">Weather</div><div class="pi-options" data-group="weather"><button type="button" class="pi-btn" data-val="clear">Clear</button><button type="button" class="pi-btn" data-val="overcast">Overcast</button><button type="button" class="pi-btn" data-val="light-rain">Light Rain</button><button type="button" class="pi-btn" data-val="wet">Wet / After Rain</button><button type="button" class="pi-btn" data-val="windy">Windy</button></div></div>
+      </div>
+    </div>
+
+    <div class="sec" id="sec-checklist">
+      <div class="sechdr" onclick="toggleSec('sec-checklist')">
+        <div class="sechdr-l">
+          <span class="sectitle">Inspection Checklist</span>
+          <span id="checklist-progress" style="font-size:11px;color:#E8763A;font-family:'Barlow Condensed';font-weight:700;margin-left:8px">0 checked</span>
+        </div>
+        <span class="secarr">&#8964;</span>
+      </div>
+      <div class="secbody" id="secbody-checklist">
+        <div class="cl-tabrow" id="cl-tabs-roof" style="display:none">
+          <button type="button" class="cl-tabbtn on" id="cl-tab-metal-btn" onclick="switchChecklistTab('metal')">Metal</button>
+          <button type="button" class="cl-tabbtn" id="cl-tab-tile-btn" onclick="switchChecklistTab('tile')">Tile</button>
+        </div>
+        <div class="cl-pane on" id="cl-pane-metal" data-list="metal"></div>
+        <div class="cl-pane" id="cl-pane-tile" data-list="tile"></div>
+        <div class="cl-pane" id="cl-pane-leak" data-list="leak"></div>
+        <div class="cl-gaps" id="cl-gaps">
+          <div class="cl-gaps-title">Possible gaps in the transcript</div>
+          <div class="cl-gaps-body" id="cl-gaps-body"></div>
         </div>
       </div>
     </div>
@@ -1123,6 +1200,8 @@ window.addEventListener('load', function(){
       // else: stay on #view-auth (initial state)
     });
   });
+  initPreInspect();
+  initChecklist();
 });
 
 function goView(v){
@@ -1139,6 +1218,345 @@ function goView(v){
 
 function toggleSec(id){ document.getElementById(id).classList.toggle('shut'); }
 
+var preInspectData = {};
+var checklistState = { metal: {}, tile: {}, leak: {}, activeTab: 'metal' };
+
+var CHECKLIST_ITEMS = {
+  metal: [
+    { id:'sheets', text:'Sheets (profile / condition)' },
+    { id:'flashings', text:'Flashings (installation / cover / condition)' },
+    { id:'flashing-joins', text:'Flashing joins' },
+    { id:'penetrations', text:'Penetrations (vent pipes / antennas)' },
+    { id:'terminations', text:'Terminations' },
+    { id:'valleys', text:'Valleys' },
+    { id:'gutters-dp', text:'Gutters & downpipes' },
+    { id:'hail-damage', text:'Hail damage (chalking required)' },
+    { id:'screws-fixings', text:'Screws & fixings (rust / washers / over-tightened)' },
+    { id:'pitch-noted', text:'Roof pitch noted' },
+    { id:'insulation', text:'Insulation / sarking' }
+  ],
+  tile: [
+    { id:'tile-cond', text:'Tile condition (cracks / breaks / slippage)' },
+    { id:'valley-cuts', text:'Valley cuts' },
+    { id:'valley-clips', text:'Valley clips' },
+    { id:'bedding-pointing', text:'Bedding & pointing' },
+    { id:'ridge', text:'Ridge condition' },
+    { id:'penetrations', text:'Penetrations' },
+    { id:'terminations', text:'Terminations' },
+    { id:'gutters-dp', text:'Gutters & downpipes' },
+    { id:'valleys', text:'Valleys' },
+    { id:'sarking', text:'Sarking' },
+    { id:'lead-flashings', text:'Lead flashings' },
+    { id:'pitch-noted', text:'Pitch noted' },
+    { id:'brand-photo', text:'Tile brand photo taken' }
+  ],
+  leak: [
+    { id:'entry-point', text:'Entry point identified' },
+    { id:'water-path', text:'Water path traced' },
+    { id:'affected-areas', text:'Affected areas noted' },
+    { id:'damage-extent', text:'Extent of damage documented' },
+    { id:'source-confirmed', text:'Source confirmed' },
+    { id:'weather-noted', text:'Weather conditions noted' },
+    { id:'roof-above', text:'Roof area above leak inspected' },
+    { id:'entry-flashings', text:'Flashings at entry point inspected' },
+    { id:'entry-penetrations', text:'Penetrations near entry point inspected' },
+    { id:'entry-photos', text:'Photos of entry point taken' },
+    { id:'internal-photos', text:'Photos of internal damage taken' },
+    { id:'temp-repair', text:'Temporary repair required noted' }
+  ]
+};
+
+function initPreInspect(){
+  document.querySelectorAll('.pi-options').forEach(function(group){
+    var isMulti = group.dataset.multi === 'true';
+    var groupKey = group.dataset.group;
+    group.querySelectorAll('.pi-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        if(isMulti){
+          if(btn.dataset.val === 'none'){
+            group.querySelectorAll('.pi-btn').forEach(function(b){ b.classList.remove('selected'); });
+            btn.classList.add('selected');
+            preInspectData[groupKey] = ['none'];
+          } else {
+            var noneBtn = group.querySelector('[data-val="none"]');
+            if(noneBtn) noneBtn.classList.remove('selected');
+            btn.classList.toggle('selected');
+            preInspectData[groupKey] = Array.from(group.querySelectorAll('.pi-btn.selected')).map(function(b){ return b.dataset.val; });
+          }
+        } else {
+          group.querySelectorAll('.pi-btn').forEach(function(b){ b.classList.remove('selected'); });
+          btn.classList.add('selected');
+          preInspectData[groupKey] = btn.dataset.val;
+          if(groupKey === 'roofType'){
+            var val = btn.dataset.val;
+            document.getElementById('pi-profile-group').style.display = val === 'metal' ? 'block' : 'none';
+            document.getElementById('pi-tilebrand-group').style.display = (val === 'tile' || val === 'concrete-tile') ? 'block' : 'none';
+            updateChecklistVisibility();
+            if(typeof setRoofType === 'function'){
+              setRoofType((val === 'tile' || val === 'concrete-tile') ? 'tile' : 'metal');
+            }
+          }
+        }
+        markEdited();
+        updatePreInspectProgress();
+        if(typeof saveJobsStore === 'function' && cid) saveJob();
+      });
+    });
+  });
+}
+
+function updatePreInspectProgress(){
+  var groups = document.querySelectorAll('#secbody-preinspect .pi-options');
+  var total = 0, filled = 0;
+  groups.forEach(function(g){
+    var host = g.closest('.pi-group');
+    if(host && host.offsetParent === null) return;
+    total++;
+    if(g.querySelectorAll('.pi-btn.selected').length > 0) filled++;
+  });
+  var label = document.getElementById('preinspect-progress');
+  if(!label) return;
+  if(filled === 0){ label.textContent = 'Not started'; label.style.color = '#E8763A'; }
+  else if(filled === total){ label.textContent = 'Complete ✓'; label.style.color = '#16A34A'; }
+  else { label.textContent = filled + ' / ' + total + ' complete'; label.style.color = '#E8763A'; }
+}
+
+function restorePreInspect(data){
+  document.querySelectorAll('#secbody-preinspect .pi-btn.selected').forEach(function(b){ b.classList.remove('selected'); });
+  preInspectData = {};
+  if(!data){
+    document.getElementById('pi-profile-group').style.display = 'none';
+    document.getElementById('pi-tilebrand-group').style.display = 'none';
+    updatePreInspectProgress();
+    return;
+  }
+  preInspectData = JSON.parse(JSON.stringify(data));
+  Object.keys(data).forEach(function(groupKey){
+    var group = document.querySelector('#secbody-preinspect [data-group="'+groupKey+'"]');
+    if(!group) return;
+    var vals = Array.isArray(data[groupKey]) ? data[groupKey] : [data[groupKey]];
+    vals.forEach(function(val){
+      var btn = group.querySelector('[data-val="'+val+'"]');
+      if(btn) btn.classList.add('selected');
+    });
+    if(groupKey === 'roofType'){
+      var val = data[groupKey];
+      document.getElementById('pi-profile-group').style.display = val === 'metal' ? 'block' : 'none';
+      document.getElementById('pi-tilebrand-group').style.display = (val === 'tile' || val === 'concrete-tile') ? 'block' : 'none';
+    }
+  });
+  if(!('roofType' in data)){
+    document.getElementById('pi-profile-group').style.display = 'none';
+    document.getElementById('pi-tilebrand-group').style.display = 'none';
+  }
+  updatePreInspectProgress();
+}
+
+function preInspectLabel(key, val){
+  var LABELS = {
+    roofType:{metal:'Metal',tile:'Tile',decramastic:'Decramastic','concrete-tile':'Concrete Tile',other:'Other'},
+    profile:{corrugated:'Corrugated',trimdek:'Trimdek',kliplok:'Kliplok','custom-orb':'Custom ORB',spandek:'Spandek',other:'Other'},
+    tileBrand:{bristile:'Bristile',monier:'Monier',boral:'Boral',unknown:'Unknown',other:'Other'},
+    roofColour:{colorbond:'Colorbond',zincalume:'Zincalume',painted:'Painted',terracotta:'Terracotta',concrete:'Concrete',unknown:'Unknown'},
+    pitch:{low:'Low (0–10°)',medium:'Medium (10–20°)',steep:'Steep (20°+)'},
+    storeys:{single:'Single',double:'Double',multi:'Multi'},
+    condition:{good:'Good',fair:'Fair',poor:'Poor','storm-damaged':'Storm Damaged','hail-damaged':'Hail Damaged'},
+    roofAge:{'0-5':'0–5 yrs','5-10':'5–10 yrs','10-20':'10–20 yrs','20-30':'20–30 yrs','30+':'30+ yrs',unknown:'Unknown'},
+    gutters:{good:'Good',fair:'Fair',poor:'Poor','not-inspected':'Not Inspected'},
+    hazards:{asbestos:'Asbestos Risk','steep-pitch':'Steep Pitch',fragile:'Fragile Sheets',powerlines:'Powerlines',height:'Extreme Height',none:'None'},
+    access:{ladder:'Ladder',scaffolding:'Scaffolding',walkway:'Walkway',ewp:'EWP','no-access':'No Access'},
+    weather:{clear:'Clear',overcast:'Overcast','light-rain':'Light Rain',wet:'Wet / After Rain',windy:'Windy'}
+  };
+  var map = LABELS[key] || {};
+  return map[val] || val;
+}
+
+function buildPreInspectContext(){
+  var keys = Object.keys(preInspectData || {});
+  if(keys.length === 0) return '';
+  var groupLabels = {
+    roofType:'Roof Type', profile:'Profile', tileBrand:'Tile Brand',
+    roofColour:'Colour/Finish', pitch:'Pitch', storeys:'Storeys',
+    condition:'Overall Condition', roofAge:'Approximate Age',
+    gutters:'Gutters', hazards:'Site Hazards', access:'Roof Access',
+    weather:'Weather'
+  };
+  var lines = ['PRE-INSPECTION DETAILS:'];
+  keys.forEach(function(key){
+    if(!groupLabels[key]) return;
+    var val = preInspectData[key];
+    if(Array.isArray(val)) val = val.map(function(v){ return preInspectLabel(key, v); }).join(', ');
+    else val = preInspectLabel(key, val);
+    if(val === '' || val == null) return;
+    lines.push(groupLabels[key] + ': ' + val);
+  });
+  return lines.length > 1 ? lines.join('\n') : '';
+}
+
+function activeChecklistKey(){
+  if(jtype === 'leak') return 'leak';
+  var rt = preInspectData && preInspectData.roofType;
+  if(rt === 'tile' || rt === 'concrete-tile') return 'tile';
+  if(rt === 'metal') return 'metal';
+  return checklistState.activeTab || 'metal';
+}
+
+function renderChecklistPane(listKey){
+  var pane = document.getElementById('cl-pane-' + listKey);
+  if(!pane) return;
+  var items = CHECKLIST_ITEMS[listKey] || [];
+  var state = checklistState[listKey] || {};
+  var html = '';
+  items.forEach(function(it){
+    var checked = !!state[it.id];
+    html += '<div class="cl-item' + (checked?' checked':'') + '" data-list="'+listKey+'" data-id="'+it.id+'">' +
+            '<span class="cl-check">✓</span>' +
+            '<span class="cl-text">' + it.text + '</span>' +
+            '</div>';
+  });
+  pane.innerHTML = html;
+}
+
+function initChecklist(){
+  ['metal','tile','leak'].forEach(renderChecklistPane);
+  var section = document.getElementById('secbody-checklist');
+  if(section){
+    section.addEventListener('click', function(e){
+      var item = e.target.closest('.cl-item');
+      if(!item) return;
+      var listKey = item.dataset.list;
+      var id = item.dataset.id;
+      if(!checklistState[listKey]) checklistState[listKey] = {};
+      if(checklistState[listKey][id]){
+        delete checklistState[listKey][id];
+        item.classList.remove('checked');
+      } else {
+        checklistState[listKey][id] = true;
+        item.classList.add('checked');
+      }
+      markEdited();
+      updateChecklistProgress();
+      if(typeof saveJobsStore === 'function' && cid) saveJob();
+    });
+  }
+  updateChecklistVisibility();
+  updateChecklistProgress();
+}
+
+function switchChecklistTab(which){
+  checklistState.activeTab = which;
+  document.getElementById('cl-tab-metal-btn').classList.toggle('on', which === 'metal');
+  document.getElementById('cl-tab-tile-btn').classList.toggle('on', which === 'tile');
+  document.getElementById('cl-pane-metal').classList.toggle('on', which === 'metal');
+  document.getElementById('cl-pane-tile').classList.toggle('on', which === 'tile');
+  updateChecklistProgress();
+}
+
+function updateChecklistVisibility(){
+  var tabs = document.getElementById('cl-tabs-roof');
+  var metalPane = document.getElementById('cl-pane-metal');
+  var tilePane = document.getElementById('cl-pane-tile');
+  var leakPane = document.getElementById('cl-pane-leak');
+  if(!tabs || !metalPane || !tilePane || !leakPane) return;
+  if(jtype === 'leak'){
+    tabs.style.display = 'none';
+    metalPane.classList.remove('on');
+    tilePane.classList.remove('on');
+    leakPane.classList.add('on');
+  } else {
+    leakPane.classList.remove('on');
+    tabs.style.display = 'flex';
+    var rt = preInspectData && preInspectData.roofType;
+    var pick;
+    if(rt === 'tile' || rt === 'concrete-tile') pick = 'tile';
+    else if(rt === 'metal') pick = 'metal';
+    else pick = checklistState.activeTab || 'metal';
+    switchChecklistTab(pick);
+  }
+  updateChecklistProgress();
+}
+
+function updateChecklistProgress(){
+  var key = activeChecklistKey();
+  var items = CHECKLIST_ITEMS[key] || [];
+  var state = checklistState[key] || {};
+  var total = items.length;
+  var done = items.filter(function(it){ return state[it.id]; }).length;
+  var label = document.getElementById('checklist-progress');
+  if(!label) return;
+  if(total === 0){ label.textContent = '0 checked'; return; }
+  if(done === 0){ label.textContent = '0 / ' + total; label.style.color = '#E8763A'; }
+  else if(done === total){ label.textContent = 'Complete ✓'; label.style.color = '#16A34A'; }
+  else { label.textContent = done + ' / ' + total; label.style.color = '#E8763A'; }
+}
+
+function restoreChecklist(data){
+  checklistState = { metal:{}, tile:{}, leak:{}, activeTab:'metal' };
+  if(data && typeof data === 'object'){
+    ['metal','tile','leak'].forEach(function(k){
+      if(data[k] && typeof data[k] === 'object') checklistState[k] = Object.assign({}, data[k]);
+    });
+    if(data.activeTab) checklistState.activeTab = data.activeTab;
+  }
+  ['metal','tile','leak'].forEach(renderChecklistPane);
+  updateChecklistVisibility();
+  hideChecklistGaps();
+}
+
+function buildChecklistContext(){
+  var key = activeChecklistKey();
+  var items = CHECKLIST_ITEMS[key] || [];
+  var state = checklistState[key] || {};
+  var checked = items.filter(function(it){ return state[it.id]; }).map(function(it){ return '- ' + it.text; });
+  if(checked.length === 0) return '';
+  var title = key === 'leak' ? 'LEAK INVESTIGATION CHECKLIST' : (key === 'tile' ? 'TILE ROOF CHECKLIST' : 'METAL ROOF CHECKLIST');
+  return title + ' — items confirmed inspected on site:\n' + checked.join('\n');
+}
+
+function showChecklistGaps(itemLabels){
+  var box = document.getElementById('cl-gaps');
+  var body = document.getElementById('cl-gaps-body');
+  if(!box || !body) return;
+  if(!itemLabels || itemLabels.length === 0){ hideChecklistGaps(); return; }
+  var lis = itemLabels.map(function(t){ return '<li>' + t.replace(/</g,'&lt;') + '</li>'; }).join('');
+  body.innerHTML = 'These checklist items were not clearly covered in the transcript &mdash; consider adding a note or ticking them off if inspected:<ul>' + lis + '</ul>';
+  box.classList.add('on');
+}
+
+function hideChecklistGaps(){
+  var box = document.getElementById('cl-gaps');
+  if(box) box.classList.remove('on');
+}
+
+function runChecklistGapAnalysis(transcript){
+  var clean = (transcript || '').trim();
+  if(!clean) return;
+  var key = activeChecklistKey();
+  var items = CHECKLIST_ITEMS[key] || [];
+  if(items.length === 0) return;
+  var list = items.map(function(it){ return '- ' + it.id + ': ' + it.text; }).join('\n');
+  var prompt = 'You are auditing an inspector\'s transcript against a checklist. For each checklist item, decide whether the transcript clearly mentions or discusses it. Return ONLY JSON, no prose, in this shape: {"missing":["id","id"]} where each id is the checklist item id NOT covered.\n\nChecklist items:\n' + list + '\n\nTranscript:\n' + clean;
+  callAI({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 400,
+    messages: [{ role:'user', content: prompt }]
+  }).then(function(data){
+    if(!data || data.error || !data.content) return;
+    var text = (data.content[0] && data.content[0].text) || '';
+    var start = text.indexOf('{'), end = text.lastIndexOf('}');
+    if(start === -1 || end === -1) return;
+    var parsed;
+    try { parsed = JSON.parse(text.substring(start, end + 1)); }
+    catch(e){ return; }
+    var missing = Array.isArray(parsed.missing) ? parsed.missing : [];
+    var labels = missing.map(function(id){
+      var it = items.find(function(x){ return x.id === id; });
+      return it ? it.text : null;
+    }).filter(Boolean);
+    showChecklistGaps(labels);
+  }).catch(function(){});
+}
+
 function switchTab(t){
   ['import','manual'].forEach(function(n){
     document.getElementById('tab-'+n+'-btn').classList.toggle('on', n===t);
@@ -1151,6 +1569,7 @@ function setType(t){
   document.getElementById('type-roof').classList.toggle('sel', t==='roof');
   document.getElementById('type-leak').classList.toggle('sel', t==='leak');
   document.getElementById('ai-entry-wrap').style.display = t==='leak'?'block':'none';
+  if(typeof updateChecklistVisibility === 'function') updateChecklistVisibility();
 }
 
 function setPill(id, msg, type){
@@ -1408,6 +1827,8 @@ function getJobData(){
     aiScope:g('ai-scope'), aiFindings:g('ai-findings'), aiEntry:g('ai-entry'),
     aiCausation:g('ai-causation'), aiMaint:g('ai-maint'),
     aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion'),
+    preInspectData: JSON.parse(JSON.stringify(preInspectData || {})),
+    checklistState: JSON.parse(JSON.stringify(checklistState || { metal:{}, tile:{}, leak:{}, activeTab:'metal' })),
     updatedAt: Date.now(),
     pdfGenerated: existing ? !!existing.pdfGenerated : false,
     completedAt: existing ? existing.completedAt : undefined,
@@ -1676,6 +2097,9 @@ function clearForm(){
   if(audioURL){ URL.revokeObjectURL(audioURL); audioURL = null; }
   audioBlob = null;
   photos = [];
+  restorePreInspect(null);
+  restoreChecklist(null);
+  hideChecklistGaps();
   updateExportBtnVisibility();
   switchTab('import');
 }
@@ -1711,6 +2135,8 @@ function openJob(id){
     document.getElementById('transcript-wrap').style.display = 'block';
   }
   updateRewriteVisibility();
+  restorePreInspect(j.preInspectData);
+  restoreChecklist(j.checklistState);
   if(j.aiScope){ document.getElementById('sec-expanded').classList.add('on'); document.getElementById('sec-expanded').style.display='block'; }
   photos = [];
   photosLoaded = false;
@@ -1892,6 +2318,7 @@ function runTranscription(){
     updateRewriteVisibility();
     setPill('voice-status','Transcript captured - record more, retake, or generate','done');
     saveJob();
+    if(typeof runChecklistGapAnalysis === 'function') runChecklistGapAnalysis(tEl.textContent || '');
   }).catch(function(e){
     var msg = (e && e.message) || 'Unknown error';
     showRecError(msg);
@@ -1932,7 +2359,16 @@ function runReportGen(transcript){
       "[ENTRY] one sentence describing where water is entering the building.\n[CAUSATION] two paragraphs"
     );
   }
-  var userMsg = 'Inspection type: ' + typeLbl + ' | Address: ' + addr + '\n\nTranscript:\n' + clean;
+  var preCtx = (typeof buildPreInspectContext === 'function') ? buildPreInspectContext() : '';
+  var clCtx = (typeof buildChecklistContext === 'function') ? buildChecklistContext() : '';
+  var contextBlock = '';
+  if(preCtx){
+    contextBlock += 'Use these pre-inspection details to accurately describe the roof in your report. These are confirmed on-site observations.\n\n' + preCtx + '\n\n';
+  }
+  if(clCtx){
+    contextBlock += 'The following checklist items were confirmed inspected on site. Only describe these items in the report; do NOT fabricate details about items that were not inspected.\n\n' + clCtx + '\n\n';
+  }
+  var userMsg = 'Inspection type: ' + typeLbl + ' | Address: ' + addr + '\n\n' + contextBlock + 'Transcript:\n' + clean;
   return callAI({
     model: 'claude-sonnet-4-6',
     max_tokens: 2000,
