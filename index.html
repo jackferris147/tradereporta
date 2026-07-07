@@ -259,8 +259,8 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 <!-- AUTH -->
 <div class="view on" id="view-auth">
   <div class="auth-wrap">
-    <div class="auth-card">
-      <div class="auth-logo" style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:6px">
+    <div class="auth-card" id="login-view">
+      <div class="auth-logo" data-auth-logo style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:6px">
         <svg width="42" height="68" viewBox="0 0 64 104" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <clipPath id="al"><rect x="4" y="6" width="50" height="82" rx="7"/></clipPath>
@@ -282,10 +282,30 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
       <div class="auth-err" id="auth-err"></div>
       <div class="fld" style="margin-bottom:10px"><label>Email</label><input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com"></div>
       <div class="fld" style="margin-bottom:10px"><label>Password</label><input type="password" id="auth-pwd" autocomplete="current-password" placeholder="At least 6 characters"></div>
+      <div style="text-align:center;margin-top:10px">
+        <a href="#" onclick="showForgotPassword();return false" style="font-size:13px;color:#6B7280;text-decoration:underline">Forgot password?</a>
+      </div>
       <div class="auth-btns">
         <button type="button" class="sbtn" onclick="doSignup()">Sign up</button>
         <button type="button" class="pbtn" onclick="doLogin()">Log in</button>
       </div>
+    </div>
+    <div class="auth-card" id="forgot-password-view" style="display:none">
+      <div class="auth-logo" data-auth-logo style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:6px"></div>
+      <div class="auth-tag">Reset your password</div>
+      <div class="auth-err" id="forgot-err"></div>
+      <div class="fld" style="margin-bottom:10px"><label>Email</label><input type="email" id="forgot-email" autocomplete="email" placeholder="you@company.com"></div>
+      <button type="button" class="pbtn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send Reset Link</button>
+      <div style="text-align:center;margin-top:14px">
+        <a href="#" onclick="showLogin();return false" style="font-size:13px;color:#6B7280">Back to login</a>
+      </div>
+    </div>
+    <div class="auth-card" id="set-password-view" style="display:none">
+      <div class="auth-logo" data-auth-logo style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:6px"></div>
+      <div class="auth-tag">Set your new password</div>
+      <div class="auth-err" id="setpwd-err"></div>
+      <div class="fld" style="margin-bottom:10px"><label>New Password</label><input type="password" id="new-password" autocomplete="new-password" placeholder="At least 6 characters"></div>
+      <button type="button" class="pbtn" style="width:100%;margin-top:14px" onclick="updatePassword()">Update Password</button>
     </div>
   </div>
 </div>
@@ -1116,6 +1136,7 @@ window.addEventListener('load', function(){
       showAuthErr('Could not load Supabase. Check your connection and reload.');
       return;
     }
+    checkPasswordRecovery();
     supa.auth.getSession().then(function(res){
       if(res && res.data && res.data.session){
         onLoggedIn();
@@ -1222,6 +1243,67 @@ function doLogout(){
   supa.auth.signOut().then(function(){
     // onAuthStateChange listener will also fire SIGNED_OUT and clear state
     clearLocalSessionState();
+  });
+}
+
+function populateAuthLogos(){
+  var src = document.querySelector('#login-view [data-auth-logo]');
+  if(!src) return;
+  var html = src.innerHTML;
+  document.querySelectorAll('#forgot-password-view [data-auth-logo], #set-password-view [data-auth-logo]').forEach(function(el){
+    if(!el.innerHTML.trim()) el.innerHTML = html;
+  });
+}
+
+function showForgotPassword(){
+  populateAuthLogos();
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('set-password-view').style.display = 'none';
+  document.getElementById('forgot-password-view').style.display = 'block';
+  clearAuthErr();
+  var pre = (g('auth-email') || '').trim();
+  if(pre) sv('forgot-email', pre);
+}
+
+function showLogin(){
+  document.getElementById('forgot-password-view').style.display = 'none';
+  document.getElementById('set-password-view').style.display = 'none';
+  document.getElementById('login-view').style.display = 'block';
+}
+
+function showSetNewPassword(){
+  populateAuthLogos();
+  goView('auth');
+  document.querySelectorAll('#view-auth .auth-card').forEach(function(el){ el.style.display = 'none'; });
+  document.getElementById('set-password-view').style.display = 'block';
+}
+
+function sendPasswordReset(){
+  var email = (g('forgot-email') || '').trim();
+  if(!email){ showToast('Enter your email first'); return; }
+  if(!supa){ showToast('Auth not ready — reload the page'); return; }
+  supa.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin }).then(function(res){
+    if(res && res.error){ showToast('Reset failed — check the email address'); return; }
+    showToast('Reset link sent — check your email');
+    showLogin();
+  }).catch(function(){ showToast('Reset failed — try again'); });
+}
+
+function updatePassword(){
+  var newPass = g('new-password');
+  if(!newPass || newPass.length < 6){ showToast('Password must be at least 6 characters'); return; }
+  if(!supa){ showToast('Auth not ready — reload the page'); return; }
+  supa.auth.updateUser({ password: newPass }).then(function(res){
+    if(res && res.error){ showToast('Update failed — try again'); return; }
+    showToast('Password updated ✓');
+    window.location.href = window.location.origin;
+  }).catch(function(){ showToast('Update failed — try again'); });
+}
+
+function checkPasswordRecovery(){
+  if(!supa) return;
+  supa.auth.onAuthStateChange(function(event){
+    if(event === 'PASSWORD_RECOVERY') showSetNewPassword();
   });
 }
 
