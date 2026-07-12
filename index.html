@@ -91,6 +91,9 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .jcard-qactions{display:flex;gap:8px;margin-top:10px}
 .jcard-qaction{display:inline-flex;align-items:center;gap:5px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;text-decoration:none;padding:6px 12px;border:1px solid #E5E7EB;border-radius:6px;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
 .jcard-qaction:hover{border-color:#E8763A;color:#E8763A}
+.jcard-photos{display:inline-flex;align-items:center;gap:4px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.5px;color:#6B7280}
+.jcard-photos.no-photos{color:#D97706}
+.jcard-photos.no-photos svg{stroke:#D97706}
 .jprogress{height:3px;background:#F3F4F6;border-radius:2px;overflow:hidden;margin-top:10px;width:100%}
 .jprogress-bar{height:100%;background:#E8763A;transition:width 0.2s}
 .jprogress-label{display:none}
@@ -2269,6 +2272,10 @@ function renderJobCard(j, sectionKey){
   html += '<div class="jcard-meta">';
   html += '<span class="jbadge">'+typeLabel+'</span>';
   if(j.invoiced) html += '<span class="jbadge binvoiced">&#10003; Invoiced</span>';
+  html += '<span class="jcard-photos" data-jobid="'+j.id+'" title="Photos on this device">' +
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>' +
+    '<span class="photo-count">&#8211;</span>' +
+    '</span>';
   var dateText = '';
   if((sectionKey === 'completed' || sectionKey === 'awaiting') && j.completedAt){
     dateText = formatRelative(j.completedAt);
@@ -2371,6 +2378,34 @@ function renderJobs(){
       '</div>';
   });
   el.innerHTML = out;
+  populateJobCardPhotoCounts();
+}
+
+async function getPhotoCount(jobId){
+  try {
+    var arr = await getPhotosForJob(jobId);
+    return arr ? arr.length : 0;
+  } catch(e){
+    return 0;
+  }
+}
+
+function populateJobCardPhotoCounts(){
+  document.querySelectorAll('#jobs-list .jcard-photos').forEach(async function(el){
+    var jobId = el.dataset.jobid;
+    if(!jobId) return;
+    var count = await getPhotoCount(jobId);
+    if(!document.body.contains(el)) return;
+    var countEl = el.querySelector('.photo-count');
+    if(!countEl) return;
+    if(count === 0){
+      el.classList.add('no-photos');
+      countEl.textContent = 'No photos';
+    } else {
+      el.classList.remove('no-photos');
+      countEl.textContent = String(count);
+    }
+  });
 }
 
 function clearForm(){
