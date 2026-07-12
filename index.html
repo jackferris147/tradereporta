@@ -531,15 +531,18 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
         <div class="pi-group"><div class="pi-label">Roof Type</div><div class="pi-options" data-group="roofType"><button type="button" class="pi-btn" data-val="metal">Metal</button><button type="button" class="pi-btn" data-val="tile">Tile</button><button type="button" class="pi-btn" data-val="decramastic">Decramastic</button><button type="button" class="pi-btn" data-val="concrete-tile">Concrete Tile</button><button type="button" class="pi-btn" data-val="other">Other</button></div></div>
         <div class="pi-group" id="pi-profile-group" style="display:none"><div class="pi-label">Profile</div><div class="pi-options" data-group="profile"><button type="button" class="pi-btn" data-val="corrugated">Corrugated</button><button type="button" class="pi-btn" data-val="trimdek">Trimdek</button><button type="button" class="pi-btn" data-val="kliplok">Kliplok</button><button type="button" class="pi-btn" data-val="custom-orb">Custom ORB</button><button type="button" class="pi-btn" data-val="spandek">Spandek</button><button type="button" class="pi-btn" data-val="other">Other</button></div></div>
         <div class="pi-group" id="pi-tilebrand-group" style="display:none"><div class="pi-label">Tile Brand</div><div class="pi-options" data-group="tileBrand"><button type="button" class="pi-btn" data-val="bristile">Bristile</button><button type="button" class="pi-btn" data-val="monier">Monier</button><button type="button" class="pi-btn" data-val="boral">Boral</button><button type="button" class="pi-btn" data-val="unknown">Unknown</button><button type="button" class="pi-btn" data-val="other">Other</button></div></div>
-        <div class="pi-group"><div class="pi-label">Colour / Finish</div><div class="pi-options" data-group="roofColour"><button type="button" class="pi-btn" data-val="colorbond">Colorbond</button><button type="button" class="pi-btn" data-val="zincalume">Zincalume</button><button type="button" class="pi-btn" data-val="painted">Painted</button><button type="button" class="pi-btn" data-val="terracotta">Terracotta</button><button type="button" class="pi-btn" data-val="concrete">Concrete</button><button type="button" class="pi-btn" data-val="unknown">Unknown</button></div></div>
-        <div class="pi-group"><div class="pi-label">Roof Pitch</div><div class="pi-options" data-group="pitch"><button type="button" class="pi-btn" data-val="low">Low (0&ndash;10&deg;)</button><button type="button" class="pi-btn" data-val="medium">Medium (10&ndash;20&deg;)</button><button type="button" class="pi-btn" data-val="steep">Steep (20&deg;+)</button></div></div>
+        <div class="pi-group">
+          <div class="pi-label">Roof Pitch (degrees)</div>
+          <input type="number" id="pi-pitch" min="0" max="60" step="0.5"
+            placeholder="e.g. 22.5"
+            style="width:120px;background:#FAFAFA;border:1px solid #E5E7EB;
+            border-radius:8px;padding:10px 14px;font-family:'Barlow',sans-serif;
+            font-size:14px;color:#1C1A18"
+            oninput="preInspectData.pitch=this.value;markEdited();updatePreInspectProgress()">
+        </div>
         <div class="pi-group"><div class="pi-label">Storeys</div><div class="pi-options" data-group="storeys"><button type="button" class="pi-btn" data-val="single">Single</button><button type="button" class="pi-btn" data-val="double">Double</button><button type="button" class="pi-btn" data-val="multi">Multi</button></div></div>
         <div class="pi-group"><div class="pi-label">Overall Condition</div><div class="pi-options" data-group="condition"><button type="button" class="pi-btn pi-btn--green" data-val="good">Good</button><button type="button" class="pi-btn pi-btn--amber" data-val="fair">Fair</button><button type="button" class="pi-btn pi-btn--orange" data-val="poor">Poor</button><button type="button" class="pi-btn pi-btn--red" data-val="storm-damaged">Storm Damaged</button><button type="button" class="pi-btn pi-btn--red" data-val="hail-damaged">Hail Damaged</button></div></div>
         <div class="pi-group"><div class="pi-label">Approximate Age</div><div class="pi-options" data-group="roofAge"><button type="button" class="pi-btn" data-val="0-5">0&ndash;5 yrs</button><button type="button" class="pi-btn" data-val="5-10">5&ndash;10 yrs</button><button type="button" class="pi-btn" data-val="10-20">10&ndash;20 yrs</button><button type="button" class="pi-btn" data-val="20-30">20&ndash;30 yrs</button><button type="button" class="pi-btn" data-val="30+">30+ yrs</button><button type="button" class="pi-btn" data-val="unknown">Unknown</button></div></div>
-        <div class="pi-group"><div class="pi-label">Gutters</div><div class="pi-options" data-group="gutters"><button type="button" class="pi-btn pi-btn--green" data-val="good">Good</button><button type="button" class="pi-btn pi-btn--amber" data-val="fair">Fair</button><button type="button" class="pi-btn pi-btn--red" data-val="poor">Poor</button><button type="button" class="pi-btn" data-val="not-inspected">Not Inspected</button></div></div>
-        <div class="pi-group"><div class="pi-label">Site Hazards</div><div class="pi-options" data-group="hazards" data-multi="true"><button type="button" class="pi-btn" data-val="asbestos">Asbestos Risk</button><button type="button" class="pi-btn" data-val="steep-pitch">Steep Pitch</button><button type="button" class="pi-btn" data-val="fragile">Fragile Sheets</button><button type="button" class="pi-btn" data-val="powerlines">Powerlines</button><button type="button" class="pi-btn" data-val="height">Extreme Height</button><button type="button" class="pi-btn" data-val="none">None</button></div></div>
-        <div class="pi-group"><div class="pi-label">Roof Access</div><div class="pi-options" data-group="access"><button type="button" class="pi-btn" data-val="ladder">Ladder</button><button type="button" class="pi-btn" data-val="scaffolding">Scaffolding</button><button type="button" class="pi-btn" data-val="walkway">Walkway</button><button type="button" class="pi-btn" data-val="ewp">EWP</button><button type="button" class="pi-btn" data-val="no-access">No Access</button></div></div>
-        <div class="pi-group"><div class="pi-label">Weather</div><div class="pi-options" data-group="weather"><button type="button" class="pi-btn" data-val="clear">Clear</button><button type="button" class="pi-btn" data-val="overcast">Overcast</button><button type="button" class="pi-btn" data-val="light-rain">Light Rain</button><button type="button" class="pi-btn" data-val="wet">Wet / After Rain</button><button type="button" class="pi-btn" data-val="windy">Windy</button></div></div>
       </div>
     </div>
 
@@ -1335,6 +1338,11 @@ function updatePreInspectProgress(){
     total++;
     if(g.querySelectorAll('.pi-btn.selected').length > 0) filled++;
   });
+  var pitchInput = document.getElementById('pi-pitch');
+  if(pitchInput){
+    total++;
+    if(pitchInput.value !== '' && pitchInput.value != null) filled++;
+  }
   var label = document.getElementById('preinspect-progress');
   if(!label) return;
   if(filled === 0){ label.textContent = 'Not started'; label.style.color = '#E8763A'; }
@@ -1344,6 +1352,8 @@ function updatePreInspectProgress(){
 
 function restorePreInspect(data){
   document.querySelectorAll('#secbody-preinspect .pi-btn.selected').forEach(function(b){ b.classList.remove('selected'); });
+  var pitchInput = document.getElementById('pi-pitch');
+  if(pitchInput) pitchInput.value = '';
   preInspectData = {};
   if(!data){
     document.getElementById('pi-profile-group').style.display = 'none';
@@ -1351,22 +1361,35 @@ function restorePreInspect(data){
     updatePreInspectProgress();
     return;
   }
-  preInspectData = JSON.parse(JSON.stringify(data));
-  Object.keys(data).forEach(function(groupKey){
+  var REMOVED_KEYS = ['roofColour','gutters','hazards','access','weather'];
+  var cleaned = {};
+  Object.keys(data).forEach(function(k){
+    if(REMOVED_KEYS.indexOf(k) === -1) cleaned[k] = data[k];
+  });
+  if('pitch' in cleaned){
+    var pv = cleaned.pitch;
+    if(pv === '' || pv == null || isNaN(parseFloat(pv))) delete cleaned.pitch;
+  }
+  preInspectData = JSON.parse(JSON.stringify(cleaned));
+  Object.keys(cleaned).forEach(function(groupKey){
+    if(groupKey === 'pitch'){
+      if(pitchInput) pitchInput.value = cleaned.pitch;
+      return;
+    }
     var group = document.querySelector('#secbody-preinspect [data-group="'+groupKey+'"]');
     if(!group) return;
-    var vals = Array.isArray(data[groupKey]) ? data[groupKey] : [data[groupKey]];
+    var vals = Array.isArray(cleaned[groupKey]) ? cleaned[groupKey] : [cleaned[groupKey]];
     vals.forEach(function(val){
       var btn = group.querySelector('[data-val="'+val+'"]');
       if(btn) btn.classList.add('selected');
     });
     if(groupKey === 'roofType'){
-      var val = data[groupKey];
+      var val = cleaned[groupKey];
       document.getElementById('pi-profile-group').style.display = val === 'metal' ? 'block' : 'none';
       document.getElementById('pi-tilebrand-group').style.display = (val === 'tile' || val === 'concrete-tile') ? 'block' : 'none';
     }
   });
-  if(!('roofType' in data)){
+  if(!('roofType' in cleaned)){
     document.getElementById('pi-profile-group').style.display = 'none';
     document.getElementById('pi-tilebrand-group').style.display = 'none';
   }
@@ -1378,15 +1401,9 @@ function preInspectLabel(key, val){
     roofType:{metal:'Metal',tile:'Tile',decramastic:'Decramastic','concrete-tile':'Concrete Tile',other:'Other'},
     profile:{corrugated:'Corrugated',trimdek:'Trimdek',kliplok:'Kliplok','custom-orb':'Custom ORB',spandek:'Spandek',other:'Other'},
     tileBrand:{bristile:'Bristile',monier:'Monier',boral:'Boral',unknown:'Unknown',other:'Other'},
-    roofColour:{colorbond:'Colorbond',zincalume:'Zincalume',painted:'Painted',terracotta:'Terracotta',concrete:'Concrete',unknown:'Unknown'},
-    pitch:{low:'Low (0–10°)',medium:'Medium (10–20°)',steep:'Steep (20°+)'},
     storeys:{single:'Single',double:'Double',multi:'Multi'},
     condition:{good:'Good',fair:'Fair',poor:'Poor','storm-damaged':'Storm Damaged','hail-damaged':'Hail Damaged'},
-    roofAge:{'0-5':'0–5 yrs','5-10':'5–10 yrs','10-20':'10–20 yrs','20-30':'20–30 yrs','30+':'30+ yrs',unknown:'Unknown'},
-    gutters:{good:'Good',fair:'Fair',poor:'Poor','not-inspected':'Not Inspected'},
-    hazards:{asbestos:'Asbestos Risk','steep-pitch':'Steep Pitch',fragile:'Fragile Sheets',powerlines:'Powerlines',height:'Extreme Height',none:'None'},
-    access:{ladder:'Ladder',scaffolding:'Scaffolding',walkway:'Walkway',ewp:'EWP','no-access':'No Access'},
-    weather:{clear:'Clear',overcast:'Overcast','light-rain':'Light Rain',wet:'Wet / After Rain',windy:'Windy'}
+    roofAge:{'0-5':'0–5 yrs','5-10':'5–10 yrs','10-20':'10–20 yrs','20-30':'20–30 yrs','30+':'30+ yrs',unknown:'Unknown'}
   };
   var map = LABELS[key] || {};
   return map[val] || val;
@@ -1397,10 +1414,8 @@ function buildPreInspectContext(){
   if(keys.length === 0) return '';
   var groupLabels = {
     roofType:'Roof Type', profile:'Profile', tileBrand:'Tile Brand',
-    roofColour:'Colour/Finish', pitch:'Pitch', storeys:'Storeys',
-    condition:'Overall Condition', roofAge:'Approximate Age',
-    gutters:'Gutters', hazards:'Site Hazards', access:'Roof Access',
-    weather:'Weather'
+    pitch:'Pitch (degrees)', storeys:'Storeys',
+    condition:'Overall Condition', roofAge:'Approximate Age'
   };
   var lines = ['PRE-INSPECTION DETAILS:'];
   keys.forEach(function(key){
