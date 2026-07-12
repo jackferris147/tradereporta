@@ -2498,6 +2498,42 @@ function handlePDF(e){
   }).catch(function(e){ setPill('wo-status','Could not read PDF: '+e.message,'err'); });
 }
 
+var wakeLock = null;
+
+async function requestWakeLock(){
+  try {
+    if('wakeLock' in navigator){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', function(){
+        console.log('Wake lock released');
+      });
+    }
+  } catch(e){
+    console.log('Wake lock failed:', e);
+  }
+}
+
+async function releaseWakeLock(){
+  try {
+    if(wakeLock){
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch(e){
+    console.log('Wake lock release failed:', e);
+  }
+}
+
+function isRecordingActive(){
+  return (mrec && mrec.state === 'recording') || (emrec && emrec.state === 'recording');
+}
+
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && isRecordingActive()){
+    requestWakeLock();
+  }
+});
+
 function toggleRec(){
   if(mrec && mrec.state==='recording'){
     mrec.stop(); clearInterval(rtimer);
@@ -2511,6 +2547,8 @@ function toggleRec(){
     mrec.ondataavailable = function(e){ achunks.push(e.data); };
     mrec.onstop = function(){
       stream.getTracks().forEach(function(t){ t.stop(); });
+      clearInterval(rtimer);
+      releaseWakeLock();
       if(audioURL){ URL.revokeObjectURL(audioURL); audioURL = null; }
       audioBlob = new Blob(achunks, {type: mrec.mimeType || 'audio/webm'});
       audioURL = URL.createObjectURL(audioBlob);
@@ -2519,9 +2557,20 @@ function toggleRec(){
       hideRecError();
       runTranscription();
     };
+    mrec.onerror = function(ev){
+      console.log('MediaRecorder error:', ev && ev.error);
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      clearInterval(rtimer);
+      releaseWakeLock();
+      document.getElementById('rec-btn').classList.remove('recording');
+      document.getElementById('rec-label').textContent = 'Record';
+      setPill('voice-status','Recording error','err');
+      showToast('Recording stopped unexpectedly — please check and re-record if needed');
+    };
     document.getElementById('recplayback').style.display = 'none';
     hideRecError();
     mrec.start();
+    requestWakeLock();
     document.getElementById('rec-btn').classList.add('recording');
     document.getElementById('rec-label').textContent = 'Stop';
     rsecs = 0;
@@ -2720,6 +2769,7 @@ function toggleEditRec(){
     emrec.ondataavailable = function(e){ eachunks.push(e.data); };
     emrec.onstop = function(){
       stream.getTracks().forEach(function(t){ t.stop(); });
+      releaseWakeLock();
       var blob = new Blob(eachunks, {type: emrec.mimeType || 'audio/webm'});
       setPill('edit-status','Transcribing edit...','work');
       whisperTranscribe(blob).then(function(text){
@@ -2727,7 +2777,16 @@ function toggleEditRec(){
         setPill('edit-status','Review the edit instruction, then tap Apply','done');
       }).catch(function(e){ setPill('edit-status','Transcription error: '+e.message,'err'); });
     };
+    emrec.onerror = function(ev){
+      console.log('MediaRecorder (edit) error:', ev && ev.error);
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      releaseWakeLock();
+      document.getElementById('edit-rec-btn').classList.remove('recording');
+      setPill('edit-status','Recording error','err');
+      showToast('Recording stopped unexpectedly — please check and re-record if needed');
+    };
     emrec.start();
+    requestWakeLock();
     document.getElementById('edit-rec-btn').classList.add('recording');
     setPill('edit-status','Recording edit instruction...','work');
   }).catch(function(){ setPill('edit-status','Microphone denied','err'); });
