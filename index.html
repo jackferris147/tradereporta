@@ -1557,14 +1557,34 @@ function renderGuidedStep(){
   var item = items[currentStepIndex];
   var saved = (guidedData[currentStructure] && guidedData[currentStructure][item.key]) || {};
   var extraVal = saved.extra || '';
+  var transcript = saved.transcript || '';
+  var isSkipped = !!saved.skipped && !transcript;
+  var recordLabel = guidedRecording ? 'Stop Recording' : (transcript ? 'Re-record' : 'Record');
+  var recordBg = guidedRecording ? '#DC2626' : '#E8763A';
+
+  var statusPanel = '';
+  if(transcript){
+    statusPanel =
+      '<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px;margin-bottom:14px">' +
+        '<div style="font-size:11px;font-family:\'Barlow Condensed\';font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">&#10003; Recorded</div>' +
+        '<div style="font-size:13px;color:#374151;line-height:1.5;white-space:pre-wrap">' + esc(transcript) + '</div>' +
+      '</div>';
+  } else if(isSkipped){
+    statusPanel =
+      '<div style="background:#F9FAFB;border:1px dashed #E5E7EB;border-radius:8px;padding:12px;margin-bottom:14px">' +
+        '<div style="font-size:12px;color:#9CA3AF;font-style:italic">Skipped &mdash; tap Record to add</div>' +
+      '</div>';
+  }
+
   stepEl.innerHTML =
     '<div style="background:#FAFAFA;border:1px solid #E5E7EB;border-radius:12px;padding:20px;margin-bottom:12px">' +
       '<div style="font-family:\'Barlow Condensed\';font-weight:900;font-size:22px;color:#1C1A18;text-transform:uppercase;letter-spacing:-0.5px;margin-bottom:6px">' + esc(item.label) + '</div>' +
       '<div style="font-size:13px;color:#6B7280;line-height:1.5;margin-bottom:16px">' + esc(item.hint) + '</div>' +
       '<div style="display:flex;gap:8px;margin-bottom:14px">' +
-        '<button class="pbtn" style="flex:1" onclick="recordGuidedItem()">Record</button>' +
+        '<button class="pbtn" style="flex:1;background:'+recordBg+'" onclick="recordGuidedItem()">' + recordLabel + '</button>' +
         '<button class="sbtn" onclick="skipGuidedItem()">Skip</button>' +
       '</div>' +
+      statusPanel +
       '<div class="pi-label">Anything else?</div>' +
       '<textarea id="guided-extra" placeholder="Optional — anything unique not covered above" ' +
         'style="width:100%;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;font-family:\'Barlow\';font-size:14px;min-height:60px;color:#1C1A18" ' +
@@ -1608,17 +1628,121 @@ function saveGuidedExtra(){
   updateGuidedProgress();
 }
 
-function recordGuidedItem(){
-  showToast('Recording — coming in next update');
+var guidedRecorder = null;
+var guidedChunks = [];
+var guidedRecording = false;
+var guidedRecStructure = null;
+var guidedRecItemKey = null;
+
+async function recordGuidedItem(){
+  if(guidedRecording){
+    stopGuidedRecording();
+    return;
+  }
+  var items = getActiveGuidedSet();
+  var item = items[currentStepIndex];
+  if(!item) return;
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    guidedChunks = [];
+    guidedRecStructure = currentStructure;
+    guidedRecItemKey = item.key;
+    guidedRecorder = new MediaRecorder(stream);
+    guidedRecorder.ondataavailable = function(e){
+      if(e.data && e.data.size > 0) guidedChunks.push(e.data);
+    };
+    guidedRecorder.onstop = async function(){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      guidedRecording = false;
+      await releaseWakeLock();
+      updateGuidedRecordButton();
+      await transcribeGuidedItem();
+    };
+    guidedRecorder.onerror = async function(ev){
+      console.log('Guided recorder error:', ev && ev.error);
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      guidedRecording = false;
+      await releaseWakeLock();
+      updateGuidedRecordButton();
+      showToast('Recording stopped unexpectedly — please re-record');
+    };
+    guidedRecorder.start();
+    guidedRecording = true;
+    await requestWakeLock();
+    updateGuidedRecordButton();
+  } catch(e){
+    showToast('Microphone access failed');
+  }
+}
+
+function stopGuidedRecording(){
+  if(guidedRecorder && guidedRecording){
+    try { guidedRecorder.stop(); } catch(e){}
+  }
+}
+
+function updateGuidedRecordButton(){
+  var stepEl = document.getElementById('guided-step');
+  if(!stepEl) return;
+  var btn = stepEl.querySelector('.pbtn');
+  if(!btn) return;
+  var items = getActiveGuidedSet();
+  var item = items[currentStepIndex];
+  var saved = item && guidedData[currentStructure] && guidedData[currentStructure][item.key];
+  var hasTranscript = !!(saved && saved.transcript);
+  if(guidedRecording){
+    btn.textContent = 'Stop Recording';
+    btn.style.background = '#DC2626';
+  } else {
+    btn.textContent = hasTranscript ? 'Re-record' : 'Record';
+    btn.style.background = '#E8763A';
+  }
+}
+
+async function transcribeGuidedItem(){
+  var structure = guidedRecStructure;
+  var itemKey = guidedRecItemKey;
+  if(!structure || !itemKey) return;
+  if(!guidedChunks.length){
+    showToast('No audio captured — please re-record');
+    return;
+  }
+  showToast('Transcribing...');
+  try {
+    var mime = (guidedRecorder && guidedRecorder.mimeType) || 'audio/webm';
+    var blob = new Blob(guidedChunks, { type: mime });
+    var text = await whisperTranscribe(blob);
+    if(!guidedData[structure]) guidedData[structure] = {};
+    if(!guidedData[structure][itemKey]) guidedData[structure][itemKey] = {};
+    guidedData[structure][itemKey].transcript = (text || '').trim();
+    guidedData[structure][itemKey].skipped = false;
+    markEdited();
+    var items = getActiveGuidedSet();
+    var curItem = items[currentStepIndex];
+    if(structure === currentStructure && curItem && curItem.key === itemKey){
+      renderGuidedStep();
+    } else {
+      updateGuidedProgress();
+    }
+    showToast('Saved ✓');
+  } catch(e){
+    console.log('Guided transcribe failed:', e && e.message);
+    showToast('Transcription failed — please re-record');
+  }
 }
 
 function skipGuidedItem(){
+  if(guidedRecording){
+    showToast('Stop recording first');
+    return;
+  }
   var items = getActiveGuidedSet();
   var item = items[currentStepIndex];
   if(!item) return;
   if(!guidedData[currentStructure]) guidedData[currentStructure] = {};
   if(!guidedData[currentStructure][item.key]) guidedData[currentStructure][item.key] = {};
   guidedData[currentStructure][item.key].skipped = true;
+  guidedData[currentStructure][item.key].transcript = '';
   showToast('Skipped ' + item.label);
   markEdited();
   nextGuidedStep();
