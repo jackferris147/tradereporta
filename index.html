@@ -63,7 +63,8 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .pill.work{background:rgba(232,118,58,0.10);color:#E8763A;border:1px solid rgba(232,118,58,0.25)}
 .pill.done{background:#EAF7EE;color:#2D8A4E;border:1px solid rgba(45,138,78,0.25)}
 .pill.err{background:#FDECEA;color:#C0392B;border:1px solid rgba(192,57,43,0.25)}
-.typerow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.typerow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+@media (max-width:520px){.typerow{grid-template-columns:1fr}}
 .typeopt{background:#FFFFFF;border:1.5px solid #E5E7EB;border-radius:10px;padding:16px;cursor:pointer;transition:all 0.15s}
 .typeopt:hover{border-color:#6B7280}
 .typeopt.sel{border-color:#E8763A;background:#FFF8F4;box-shadow:0 0 0 1px #E8763A}
@@ -459,6 +460,9 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
       <div class="typeopt" id="type-leak" onclick="setType('leak')">
         <div class="tn">Leak Investigation</div><div class="td">Water ingress, entry point</div>
       </div>
+      <div class="typeopt" id="type-makesafe" onclick="setType('makesafe')">
+        <div class="tn">Make Safe</div><div class="td">Emergency response, temporary works</div>
+      </div>
     </div>
 
     <div class="pi-group" id="event-toggle-row" style="margin-bottom:16px">
@@ -647,12 +651,15 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
         </div>
         <div id="edit-status" style="margin-bottom:10px"></div>
         <div class="fld" style="margin-bottom:12px"><label>Scope of Works</label><textarea id="ai-scope" class="lg"></textarea></div>
+        <div class="fld" id="ai-issue-wrap" style="margin-bottom:12px;display:none"><label>Issue Identified</label><textarea id="ai-issue" class="lg" placeholder="The problem found on arrival (active leak, storm damage, lifted sheets...)."></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Findings (Area | Observation | Photos &mdash; one per line)</label><textarea id="ai-findings" style="min-height:130px;background:#F7F5F2;border:1px solid #E2DDD8;border-radius:6px;color:#1C1A18;font-family:'Barlow',sans-serif;font-size:14px;padding:9px 12px;width:100%;resize:vertical;line-height:1.5;outline:none"></textarea></div>
         <div class="fld" id="ai-entry-wrap" style="margin-bottom:12px;display:none"><label>Point of Water Entry</label><textarea id="ai-entry"></textarea></div>
         <div class="fld" id="ai-event-damage-wrap" style="margin-bottom:12px;display:none"><label>Event Damage</label><textarea id="ai-event-damage" class="lg" placeholder="Storm, hail or impact damage found during inspection..."></textarea></div>
-        <div class="fld" style="margin-bottom:12px"><label>Maintenance Items</label><textarea id="ai-maint" placeholder="Maintenance items found on site..."></textarea></div>
+        <div class="fld" id="ai-works-wrap" style="margin-bottom:12px;display:none"><label>Works Carried Out</label><textarea id="ai-works" class="lg" placeholder="Temporary/emergency works performed &mdash; tarping, securing sheets, temporary flashing..."></textarea></div>
+        <div class="fld" id="ai-maint-wrap" style="margin-bottom:12px"><label>Maintenance Items</label><textarea id="ai-maint" placeholder="Maintenance items found on site..."></textarea></div>
         <div class="fld" id="ai-causation-wrap" style="margin-bottom:12px"><label>Causation</label><textarea id="ai-causation" class="lg"></textarea></div>
-        <div class="fld" style="margin-bottom:12px"><label>Recommendations (Priority: Action &mdash; one per line)</label><textarea id="ai-recs"></textarea></div>
+        <div class="fld" id="ai-limitations-wrap" style="margin-bottom:12px;display:none"><label>Limitations &amp; Recommendations</label><textarea id="ai-limitations" class="lg" placeholder="What the make safe does NOT fix, permanent works required, time sensitivity..."></textarea></div>
+        <div class="fld" id="ai-recs-wrap" style="margin-bottom:12px"><label>Recommendations (Priority: Action &mdash; one per line)</label><textarea id="ai-recs"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Conclusion</label><textarea id="ai-conclusion" class="lg"></textarea></div>
       </div>
     </div>
@@ -734,7 +741,38 @@ var WHISPER_VOCAB = 'Roofing inspection report. Terms include: ridge cap, valley
 function buildReportSystemPrompt(jt, evt, brandCompany){
   var C = brandCompany || 'JFR Roofing';
   var isLeak = jt === 'leak';
-  var isEvent = !isLeak && !!evt;
+  var isMakeSafe = jt === 'makesafe';
+  var isEvent = !isLeak && !isMakeSafe && !!evt;
+
+  if(isMakeSafe){
+    var ms = [];
+    ms.push("You are a professional report writer for " + C + ", a Gold Coast based roofing specialist.");
+    ms.push("");
+    ms.push("Write as an experienced Australian roofing tradesman who has attended site to carry out emergency make safe works. The audience may be an insurance assessor, strata manager or property owner - keep the language general and suitable for any client. Use plain clear language. Avoid jargon where possible.");
+    ms.push("");
+    ms.push("STRICT RULES:");
+    ms.push("- Keep the report concise and professional. Make safe reports are shorter than full inspection reports. Aim for clarity over length.");
+    ms.push("- The report must read smoothly and professionally from start to finish. If a sentence feels clunky, awkward or overly technical rewrite it.");
+    ms.push("- Never add bracketed explanations after technical terms. Use the correct technical term only.");
+    ms.push("- Each section must contain ONLY information relevant to that section.");
+    ms.push("- Make safe works are TEMPORARY by definition. Never describe them as permanent repairs. Always be clear about what remains to be done.");
+    ms.push("- Do NOT hardcode insurance or claim specific language. Suit the report to any client.");
+    ms.push("- Scope: state that " + C + " attended site to carry out emergency make safe works, referencing the issue or event that prompted the call-out.");
+    ms.push("- Issue: describe the problem identified on arrival (active leak, storm damage, lifted sheets, dangerous condition). One short paragraph.");
+    ms.push("- Findings: related observations recorded while on site, one per line in the format 'Area | Observation'. Group related items under one row. Only include findings that inform the make safe works or the property's ongoing condition.");
+    ms.push("- Works Carried Out: clearly document the temporary or emergency works performed - tarping, securing sheets, temporary flashing, isolating an area, removing hazards. Be specific about materials used and the exact locations worked on. Written as clear dot points or short paragraphs.");
+    ms.push("- Limitations & Recommendations: state clearly that make safe works are TEMPORARY and do not constitute a permanent repair. Describe what permanent works are required and any time sensitivity (for example, 'temporary tarping should be replaced with a permanent repair within X weeks to prevent further water ingress'). Do NOT re-list unrelated maintenance items here.");
+    ms.push("- Conclusion: one short paragraph summarising the make safe outcome and the property's current status.");
+    ms.push("");
+    ms.push("OUTPUT FORMAT - respond with exactly these tags, no other text:");
+    ms.push("[SCOPE] one or two sentences starting with 'As requested, " + C + " attended site to carry out emergency make safe works...'");
+    ms.push("[ISSUE] one short paragraph describing the problem identified on arrival.");
+    ms.push("[FINDINGS] one finding per line in format: Area | Observation. Group related issues under one row.");
+    ms.push("[WORKS] clear dot points or short paragraphs describing the temporary works performed. Be specific about materials and locations.");
+    ms.push("[LIMITATIONS] one or two short paragraphs. Clearly state that the works are temporary, describe what permanent repair is required, and note any time sensitivity.");
+    ms.push("[CONCLUSION] one short paragraph starting with '" + C + " has...'");
+    return ms.join("\n");
+  }
 
   var lines = [];
   lines.push("You are a professional report writer for " + C + ", a Gold Coast based roofing specialist.");
@@ -1595,6 +1633,14 @@ function updateChecklistVisibility(){
   var tilePane = document.getElementById('cl-pane-tile');
   var leakPane = document.getElementById('cl-pane-leak');
   if(!tabs || !metalPane || !tilePane || !leakPane) return;
+  if(jtype === 'makesafe'){
+    tabs.style.display = 'none';
+    metalPane.classList.remove('on');
+    tilePane.classList.remove('on');
+    leakPane.classList.remove('on');
+    updateChecklistProgress();
+    return;
+  }
   if(jtype === 'leak'){
     tabs.style.display = 'none';
     metalPane.classList.remove('on');
@@ -1703,13 +1749,26 @@ function switchTab(t){
 
 function setType(t){
   jtype = t;
-  document.getElementById('type-roof').classList.toggle('sel', t==='roof');
-  document.getElementById('type-leak').classList.toggle('sel', t==='leak');
-  document.getElementById('ai-entry-wrap').style.display = t==='leak'?'block':'none';
+  var isRoof = t==='roof';
+  var isLeak = t==='leak';
+  var isMakeSafe = t==='makesafe';
+  document.getElementById('type-roof').classList.toggle('sel', isRoof);
+  document.getElementById('type-leak').classList.toggle('sel', isLeak);
+  var msCard = document.getElementById('type-makesafe');
+  if(msCard) msCard.classList.toggle('sel', isMakeSafe);
+  document.getElementById('ai-entry-wrap').style.display = isLeak?'block':'none';
   var evRow = document.getElementById('event-toggle-row');
-  if(evRow) evRow.style.display = t==='leak' ? 'none' : 'block';
+  if(evRow) evRow.style.display = isRoof ? 'block' : 'none';
   var causWrap = document.getElementById('ai-causation-wrap');
-  if(causWrap) causWrap.style.display = t==='leak' ? 'block' : 'none';
+  if(causWrap) causWrap.style.display = isLeak ? 'block' : 'none';
+  function showField(id, show){ var el = document.getElementById(id); if(el) el.style.display = show ? 'block' : 'none'; }
+  showField('ai-issue-wrap', isMakeSafe);
+  showField('ai-works-wrap', isMakeSafe);
+  showField('ai-limitations-wrap', isMakeSafe);
+  showField('ai-maint-wrap', !isMakeSafe);
+  showField('ai-recs-wrap', !isMakeSafe);
+  var checklistSec = document.getElementById('sec-checklist');
+  if(checklistSec) checklistSec.style.display = isMakeSafe ? 'none' : '';
   updateEventDamageVisibility();
   if(typeof updateChecklistVisibility === 'function') updateChecklistVisibility();
 }
@@ -1724,7 +1783,7 @@ function toggleEventRelated(){
 function updateEventDamageVisibility(){
   var wrap = document.getElementById('ai-event-damage-wrap');
   if(!wrap) return;
-  wrap.style.display = (jtype !== 'leak' && eventRelated) ? 'block' : 'none';
+  wrap.style.display = (jtype === 'roof' && eventRelated) ? 'block' : 'none';
 }
 
 function setPill(id, msg, type){
@@ -2043,6 +2102,7 @@ function getJobData(){
     aiScope:g('ai-scope'), aiFindings:g('ai-findings'), aiEntry:g('ai-entry'),
     aiCausation:g('ai-causation'), aiMaint:g('ai-maint'),
     aiEventDamage:g('ai-event-damage'),
+    aiIssue:g('ai-issue'), aiWorks:g('ai-works'), aiLimitations:g('ai-limitations'),
     aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion'),
     eventRelated: !!eventRelated,
     preInspectData: JSON.parse(JSON.stringify(preInspectData || {})),
@@ -2192,7 +2252,7 @@ function reopenJob(id){
 }
 
 function renderJobCard(j, sectionKey){
-  var typeLabel = j.type === 'leak' ? 'Leak Investigation' : 'Roof Inspection';
+  var typeLabel = j.type === 'leak' ? 'Leak Investigation' : (j.type === 'makesafe' ? 'Make Safe' : 'Roof Inspection');
   var title = j.address || j.client || 'Untitled report';
   var subParts = [];
   if(j.client && j.address) subParts.push(esc(j.client));
@@ -2295,7 +2355,7 @@ function renderJobs(){
 function clearForm(){
   var flds = ['client','ref','cm','cmemail','insurer','insurerref','customer','custphone','address','inspector','weather','roofmat','notes'];
   flds.forEach(function(f){ sv('f-'+f,''); });
-  var ais = ['scope','findings','entry','event-damage','causation','maint','recs','conclusion'];
+  var ais = ['scope','findings','entry','event-damage','issue','works','limitations','causation','maint','recs','conclusion'];
   ais.forEach(function(f){ sv('ai-'+f,''); });
   eventRelated = false;
   var evChk = document.getElementById('event-related');
@@ -2351,6 +2411,9 @@ function openJob(id){
   sv('ai-scope',j.aiScope); sv('ai-findings',j.aiFindings); sv('ai-entry',j.aiEntry);
   sv('ai-causation',j.aiCausation);
   sv('ai-event-damage', j.aiEventDamage || '');
+  sv('ai-issue', j.aiIssue || '');
+  sv('ai-works', j.aiWorks || '');
+  sv('ai-limitations', j.aiLimitations || '');
   sv('ai-maint', j.aiMaint || [j.aiMaintExisting, j.aiMaintRecommended].filter(Boolean).join('\n\n') || '');
   sv('ai-recs',j.aiRecs); sv('ai-conclusion',j.aiConclusion);
   eventRelated = !!j.eventRelated;
@@ -2411,7 +2474,7 @@ function parseWO(){
     if(p.custphone) sv('f-custphone',p.custphone);
     if(p.address){ sv('f-address',p.address); document.getElementById('form-title').textContent=p.address; document.getElementById('gen-name').textContent=p.address; }
     if(p.roofmat) sv('f-roofmat',p.roofmat);
-    if(p.type==='leak'||p.type==='roof') setType(p.type);
+    if(p.type==='leak'||p.type==='roof'||p.type==='makesafe') setType(p.type);
     setPill('wo-status','Job details filled in - review below','done');
     showToast('Work order imported');
     saveJob();
@@ -2577,7 +2640,7 @@ function runReportGen(transcript){
   document.getElementById('gen-btn').disabled = true;
   setPill('expand-status','AI writing your report sections...','work');
   var addr = g('f-address') || 'the property';
-  var typeLbl = jtype === 'leak' ? 'leak' : (eventRelated ? 'event-related roof' : 'roof');
+  var typeLbl = jtype === 'leak' ? 'leak' : (jtype === 'makesafe' ? 'make safe' : (eventRelated ? 'event-related roof' : 'roof'));
   var brandCompany = getBrand().company || 'JFR Roofing';
   var systemPrompt = buildReportSystemPrompt(jtype, eventRelated, brandCompany);
   var preCtx = (typeof buildPreInspectContext === 'function') ? buildPreInspectContext() : '';
@@ -2609,6 +2672,9 @@ function runReportGen(transcript){
     sv('ai-scope',ex('SCOPE')); sv('ai-findings',ex('FINDINGS')); sv('ai-entry',ex('ENTRY'));
     sv('ai-causation',ex('CAUSATION'));
     sv('ai-event-damage', ex('EVENT_DAMAGE'));
+    sv('ai-issue', ex('ISSUE'));
+    sv('ai-works', ex('WORKS'));
+    sv('ai-limitations', ex('LIMITATIONS'));
     sv('ai-maint',ex('MAINTENANCE'));
     sv('ai-recs',ex('RECOMMENDATIONS')); sv('ai-conclusion',ex('CONCLUSION'));
     document.getElementById('sec-expanded').classList.add('on');
@@ -2670,19 +2736,25 @@ function toggleEditRec(){
 function applyEdit(){
   var instr = document.getElementById('edit-text').value.trim();
   if(!instr){ showToast('Type or speak an edit instruction first'); return; }
-  var order = ['SCOPE','FINDINGS'];
-  if(jtype === 'leak'){
-    order.push('ENTRY','CAUSATION','MAINTENANCE');
-  } else if(eventRelated){
-    order.push('EVENT_DAMAGE','MAINTENANCE');
+  var order;
+  if(jtype === 'makesafe'){
+    order = ['SCOPE','ISSUE','FINDINGS','WORKS','LIMITATIONS','CONCLUSION'];
   } else {
-    order.push('MAINTENANCE');
+    order = ['SCOPE','FINDINGS'];
+    if(jtype === 'leak'){
+      order.push('ENTRY','CAUSATION','MAINTENANCE');
+    } else if(eventRelated){
+      order.push('EVENT_DAMAGE','MAINTENANCE');
+    } else {
+      order.push('MAINTENANCE');
+    }
+    order.push('RECOMMENDATIONS','CONCLUSION');
   }
-  order.push('RECOMMENDATIONS','CONCLUSION');
   var fieldMap = {
     SCOPE:'ai-scope', FINDINGS:'ai-findings', ENTRY:'ai-entry',
     CAUSATION:'ai-causation', MAINTENANCE:'ai-maint',
     EVENT_DAMAGE:'ai-event-damage',
+    ISSUE:'ai-issue', WORKS:'ai-works', LIMITATIONS:'ai-limitations',
     RECOMMENDATIONS:'ai-recs', CONCLUSION:'ai-conclusion'
   };
   var currentBlock = order.map(function(tag){
@@ -2825,6 +2897,16 @@ function closePreview(){
 }
 
 function previewSections(){
+  if(jtype === 'makesafe'){
+    return [
+      { key:'ai-scope',       label:'Scope of Works',            type:'text' },
+      { key:'ai-issue',       label:'Issue Identified',          type:'text' },
+      { key:'ai-findings',    label:'Findings',                  type:'findings' },
+      { key:'ai-works',       label:'Works Carried Out',         type:'text' },
+      { key:'ai-limitations', label:'Limitations & Recommendations', type:'text' },
+      { key:'ai-conclusion',  label:'Conclusion',                type:'text' }
+    ];
+  }
   var arr = [
     { key:'ai-scope',      label:'Scope of Works',  type:'text' },
     { key:'ai-findings',   label:'Findings',        type:'findings' }
@@ -3382,8 +3464,12 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   var localPhotos = (photos||[]).slice();
   var f = getJobData();
   var isLeak = f.type==='leak';
-  var isEvent = !isLeak && !!f.eventRelated;
+  var isMakeSafe = f.type==='makesafe';
+  var isEvent = !isLeak && !isMakeSafe && !!f.eventRelated;
   var eventDamage = f.aiEventDamage || '';
+  var msIssue = f.aiIssue || '';
+  var msWorks = f.aiWorks || '';
+  var msLimitations = f.aiLimitations || '';
   var brand = getBrand();
   var brandColour = brand.colour;
   var shText = brandTextOn(brandColour);
@@ -3414,8 +3500,8 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   ].filter(Boolean).join('<br>');
   var pfooterLeft = [brandCompanyEsc, brandAbnDisp, brandEmailEsc, brandPhoneEsc, brandAddrEsc].filter(Boolean).join(' &nbsp;|&nbsp; ');
   var pfooterRight = brandLicEsc;
-  var title = isLeak?'LEAK INVESTIGATION REPORT':'ROOF INSPECTION REPORT';
-  var sub = isLeak?'Insurance & Strata &mdash; Water Ingress Investigation':'Insurance & Strata &mdash; Roof Assessment';
+  var title = isMakeSafe ? 'MAKE SAFE REPORT' : (isLeak ? 'LEAK INVESTIGATION REPORT' : 'ROOF INSPECTION REPORT');
+  var sub = isMakeSafe ? 'Emergency Response &mdash; Temporary Works' : (isLeak ? 'Insurance & Strata &mdash; Water Ingress Investigation' : 'Insurance & Strata &mdash; Roof Assessment');
 
   findings = matchPhotos(findings, localPhotos);
 
@@ -3542,6 +3628,10 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   var eventH = (isEvent && eventDamage) ? '<div class="secwrap"><div class="sh">Event Damage</div><div class="bx">'+esc(eventDamage)+'</div></div>' : '';
   var causationH = (isLeak && causation) ? '<div class="secwrap"><div class="sh">Causation</div><div class="bx">'+esc(causation||'')+'</div></div>' : '';
 
+  var msIssueH = (isMakeSafe && msIssue) ? '<div class="secwrap"><div class="sh">Issue Identified</div><div class="bx">'+esc(msIssue)+'</div></div>' : '';
+  var msWorksH = (isMakeSafe && msWorks) ? '<div class="secwrap"><div class="sh">Works Carried Out</div><div class="bx">'+esc(msWorks)+'</div></div>' : '';
+  var msLimitationsH = (isMakeSafe && msLimitations) ? '<div class="secwrap"><div class="sh">Limitations &amp; Recommendations</div><div class="bx">'+esc(msLimitations)+'</div></div>' : '';
+
   var photoH = pdfPhotos.length?'<div class="sh ph-head">SITE PHOTOGRAPHS</div><div style="margin-top:6px">'+photoRows+'</div>':'';
 
   var coverInfo = '';
@@ -3632,7 +3722,9 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   '<table><tbody>'+kvRows+'</tbody></table></div>' +
 
   '<div class="sh">Scope of Works</div>' +
-  '<div class="bx">'+esc(scope||('As requested, '+brand.company+' attended site to carry out a comprehensive inspection.'))+'</div>' +
+  '<div class="bx">'+esc(scope||('As requested, '+brand.company+' attended site to '+(isMakeSafe?'carry out emergency make safe works.':'carry out a comprehensive inspection.')))+'</div>' +
+
+  msIssueH +
 
   '<div class="sh">Findings</div>' +
   '<table><thead><tr>' +
@@ -3644,15 +3736,21 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
 
   eventH +
 
+  msWorksH +
+
   maintH +
 
   causationH +
 
-  '<div class="secwrap"><div class="sh">Recommendations</div>' +
-  '<table><thead><tr>' +
-    '<th class="th" style="width:90px">Priority</th>' +
-    '<th class="th">Recommended Action</th>' +
-  '</tr></thead><tbody>'+recRows+'</tbody></table></div>' +
+  msLimitationsH +
+
+  (isMakeSafe ? '' :
+    '<div class="secwrap"><div class="sh">Recommendations</div>' +
+    '<table><thead><tr>' +
+      '<th class="th" style="width:90px">Priority</th>' +
+      '<th class="th">Recommended Action</th>' +
+    '</tr></thead><tbody>'+recRows+'</tbody></table></div>'
+  ) +
 
   '<div class="secwrap"><div class="sh">Conclusion</div>' +
   '<div class="bx">'+esc(conclusion||'')+'</div></div>' +
