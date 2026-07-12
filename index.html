@@ -597,6 +597,49 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
       </div>
     </div>
 
+    <div class="sec" id="sec-guided">
+      <div class="sechdr" onclick="toggleSec('sec-guided')">
+        <div class="sechdr-l">
+          <span class="sectitle">Guided Inspection</span>
+          <span id="guided-progress" style="font-size:11px;color:#E8763A;font-family:'Barlow Condensed';font-weight:700;margin-left:8px">0 / 0</span>
+        </div>
+        <span class="secarr">&#8964;</span>
+      </div>
+      <div class="secbody" id="secbody-guided">
+
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#6B7280;font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:0.5px">
+            Freeform mode
+            <input type="checkbox" id="freeform-toggle"
+              style="width:18px;height:18px;accent-color:#E8763A"
+              onchange="toggleFreeformMode()">
+          </label>
+        </div>
+
+        <div id="structure-bar" style="margin-bottom:16px">
+          <div class="pi-label">Currently Inspecting</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="current-structure" onchange="setCurrentStructure()"
+              style="background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;font-family:'Barlow Condensed';font-weight:700;font-size:14px;color:#1C1A18;text-transform:uppercase;letter-spacing:0.5px">
+              <option value="Main Roof">Main Roof</option>
+            </select>
+            <button class="sbtn" onclick="addStructure()" style="padding:8px 14px">+ Add Structure</button>
+          </div>
+        </div>
+
+        <div id="guided-step" style="display:none"></div>
+
+        <div id="freeform-area" style="display:none">
+          <div style="font-size:13px;color:#6B7280;text-align:center;padding:20px">
+            Freeform mode &mdash; record one continuous voice note covering everything.
+          </div>
+        </div>
+
+        <div id="guided-review" style="display:none"></div>
+
+      </div>
+    </div>
+
     <div class="sec" id="sec-voice">
       <div class="sechdr" onclick="toggleSec('sec-voice')">
         <div class="sechdr-l"><span>&#127897;</span><span class="sectitle">Voice Notes</span></div>
@@ -1390,6 +1433,236 @@ function toggleSec(id){ document.getElementById(id).classList.toggle('shut'); }
 var preInspectData = {};
 var checklistState = { metal: {}, tile: {}, leak: {}, activeTab: 'metal' };
 
+var guidedItems = {
+  metal: [
+    { key: 'sheets', label: 'Sheets', hint: 'Profile type, condition, any damage or wear' },
+    { key: 'flashings', label: 'Flashings', hint: 'Cover, joins, condition, gaps or rust' },
+    { key: 'penetrations', label: 'Penetrations', hint: 'Vent pipes, antennas, dektites — back trays, seals, flashing' },
+    { key: 'valleys', label: 'Valleys', hint: 'Condition, laps, debris' },
+    { key: 'gutters', label: 'Gutters & Downpipes', hint: 'Condition, falls, blockages, debris' },
+    { key: 'event', label: 'Hail / Event Damage', hint: 'Extent, % affected, impact marks, chalking needed' },
+    { key: 'fixings', label: 'Screws & Fixings', hint: 'Rust, washers, over or under tightened' },
+    { key: 'insulation', label: 'Insulation / Sarking', hint: 'Present, condition' }
+  ],
+  tile: [
+    { key: 'tiles', label: 'Tiles', hint: 'Condition, cracks, breaks, slippage, type or brand (photo of underside)' },
+    { key: 'valleys', label: 'Valley Cuts & Clips', hint: 'Condition, clips present and secure' },
+    { key: 'bedding', label: 'Bedding & Pointing', hint: 'Condition, any cracks visible, weep holes' },
+    { key: 'ridge', label: 'Ridge', hint: 'Alignment, condition' },
+    { key: 'penetrations', label: 'Penetrations', hint: 'Vent pipes, antennas, dektites — seals, flashing' },
+    { key: 'gutters', label: 'Gutters & Downpipes', hint: 'Condition, falls, blockages' },
+    { key: 'leadflashings', label: 'Lead Flashings', hint: 'Condition, dressed correctly' },
+    { key: 'sarking', label: 'Sarking', hint: 'Present, condition' }
+  ],
+  leak: [
+    { key: 'entry', label: 'Entry Point', hint: 'Where water enters and how it travelled internally' },
+    { key: 'affected', label: 'Affected Areas', hint: 'Rooms and areas affected, extent of damage' },
+    { key: 'roofarea', label: 'Roof Around Area of Concern', hint: 'Condition around the suspected entry' },
+    { key: 'general', label: 'General Roof Condition', hint: 'Overall state of the roof' },
+    { key: 'source', label: 'Source Confirmed', hint: 'Confirmed not assumed' }
+  ]
+};
+
+var structures = ['Main Roof'];
+var currentStructure = 'Main Roof';
+var guidedMode = true;
+var guidedData = {};
+var currentStepIndex = 0;
+
+function getActiveGuidedSet(){
+  if(jtype === 'leak') return guidedItems.leak;
+  if(jtype === 'makesafe') return [];
+  var rt = preInspectData && preInspectData.roofType;
+  return (rt === 'tile' || rt === 'concrete-tile') ? guidedItems.tile : guidedItems.metal;
+}
+
+function rebuildStructureSelect(){
+  var sel = document.getElementById('current-structure');
+  if(!sel) return;
+  sel.innerHTML = '';
+  structures.forEach(function(name){
+    var opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  if(structures.indexOf(currentStructure) === -1){
+    currentStructure = structures[0] || 'Main Roof';
+  }
+  sel.value = currentStructure;
+}
+
+function setCurrentStructure(){
+  var sel = document.getElementById('current-structure');
+  if(!sel) return;
+  currentStructure = sel.value;
+  currentStepIndex = 0;
+  renderGuidedStep();
+  markEdited();
+}
+
+function addStructure(){
+  var name = prompt('Structure name (e.g. Garage, Carport, Shed):');
+  if(!name || !name.trim()) return;
+  name = name.trim();
+  if(structures.indexOf(name) === -1){
+    structures.push(name);
+    rebuildStructureSelect();
+    currentStructure = name;
+    document.getElementById('current-structure').value = name;
+    currentStepIndex = 0;
+    renderGuidedStep();
+  }
+  markEdited();
+}
+
+function updateGuidedVisibility(){
+  var secGuided = document.getElementById('sec-guided');
+  var secVoice = document.getElementById('sec-voice');
+  var isMakeSafe = jtype === 'makesafe';
+  if(secGuided) secGuided.style.display = isMakeSafe ? 'none' : '';
+  if(secVoice) secVoice.style.display = (!isMakeSafe && guidedMode) ? 'none' : '';
+  var stepEl = document.getElementById('guided-step');
+  var structBar = document.getElementById('structure-bar');
+  var freeformEl = document.getElementById('freeform-area');
+  if(stepEl) stepEl.style.display = (guidedMode && !isMakeSafe) ? 'block' : 'none';
+  if(structBar) structBar.style.display = (guidedMode && !isMakeSafe) ? 'block' : 'none';
+  if(freeformEl) freeformEl.style.display = (!guidedMode && !isMakeSafe) ? 'block' : 'none';
+}
+
+function toggleFreeformMode(){
+  var chk = document.getElementById('freeform-toggle');
+  guidedMode = !(chk && chk.checked);
+  updateGuidedVisibility();
+  if(guidedMode) renderGuidedStep();
+  markEdited();
+}
+
+function renderGuidedStep(){
+  var stepEl = document.getElementById('guided-step');
+  if(!stepEl) return;
+  if(jtype === 'makesafe'){
+    stepEl.style.display = 'none';
+    updateGuidedProgress();
+    return;
+  }
+  var items = getActiveGuidedSet();
+  if(items.length === 0){
+    stepEl.style.display = 'none';
+    updateGuidedProgress();
+    return;
+  }
+  if(currentStepIndex >= items.length) currentStepIndex = items.length - 1;
+  if(currentStepIndex < 0) currentStepIndex = 0;
+  if(guidedMode) stepEl.style.display = 'block';
+  var item = items[currentStepIndex];
+  var saved = (guidedData[currentStructure] && guidedData[currentStructure][item.key]) || {};
+  var extraVal = saved.extra || '';
+  stepEl.innerHTML =
+    '<div style="background:#FAFAFA;border:1px solid #E5E7EB;border-radius:12px;padding:20px;margin-bottom:12px">' +
+      '<div style="font-family:\'Barlow Condensed\';font-weight:900;font-size:22px;color:#1C1A18;text-transform:uppercase;letter-spacing:-0.5px;margin-bottom:6px">' + esc(item.label) + '</div>' +
+      '<div style="font-size:13px;color:#6B7280;line-height:1.5;margin-bottom:16px">' + esc(item.hint) + '</div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:14px">' +
+        '<button class="pbtn" style="flex:1" onclick="recordGuidedItem()">Record</button>' +
+        '<button class="sbtn" onclick="skipGuidedItem()">Skip</button>' +
+      '</div>' +
+      '<div class="pi-label">Anything else?</div>' +
+      '<textarea id="guided-extra" placeholder="Optional — anything unique not covered above" ' +
+        'style="width:100%;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;font-family:\'Barlow\';font-size:14px;min-height:60px;color:#1C1A18" ' +
+        'oninput="saveGuidedExtra()">' + esc(extraVal) + '</textarea>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<button class="sbtn" onclick="prevGuidedStep()"' + (currentStepIndex === 0 ? ' disabled' : '') + '>Back</button>' +
+      '<span style="font-size:13px;color:#6B7280;font-family:\'Barlow Condensed\';font-weight:700">' + (currentStepIndex + 1) + ' of ' + items.length + '</span>' +
+      '<button class="sbtn" onclick="nextGuidedStep()">Next</button>' +
+    '</div>';
+  updateGuidedProgress();
+}
+
+function nextGuidedStep(){
+  var items = getActiveGuidedSet();
+  if(currentStepIndex < items.length - 1){
+    currentStepIndex++;
+    renderGuidedStep();
+  } else {
+    showGuidedReview();
+  }
+}
+
+function prevGuidedStep(){
+  if(currentStepIndex > 0){
+    currentStepIndex--;
+    renderGuidedStep();
+  }
+}
+
+function saveGuidedExtra(){
+  var items = getActiveGuidedSet();
+  var item = items[currentStepIndex];
+  if(!item) return;
+  if(!guidedData[currentStructure]) guidedData[currentStructure] = {};
+  if(!guidedData[currentStructure][item.key]) guidedData[currentStructure][item.key] = {};
+  var ta = document.getElementById('guided-extra');
+  if(!ta) return;
+  guidedData[currentStructure][item.key].extra = ta.value;
+  markEdited();
+  updateGuidedProgress();
+}
+
+function recordGuidedItem(){
+  showToast('Recording — coming in next update');
+}
+
+function skipGuidedItem(){
+  var items = getActiveGuidedSet();
+  var item = items[currentStepIndex];
+  if(!item) return;
+  if(!guidedData[currentStructure]) guidedData[currentStructure] = {};
+  if(!guidedData[currentStructure][item.key]) guidedData[currentStructure][item.key] = {};
+  guidedData[currentStructure][item.key].skipped = true;
+  showToast('Skipped ' + item.label);
+  markEdited();
+  nextGuidedStep();
+}
+
+function showGuidedReview(){
+  showToast('Review screen — coming in next update');
+}
+
+function updateGuidedProgress(){
+  var items = getActiveGuidedSet();
+  var total = items.length * structures.length;
+  var done = 0;
+  structures.forEach(function(s){
+    if(guidedData[s]){
+      items.forEach(function(it){
+        var d = guidedData[s][it.key];
+        if(d && (d.transcript || d.skipped)) done++;
+      });
+    }
+  });
+  var label = document.getElementById('guided-progress');
+  if(label) label.textContent = done + ' / ' + total;
+}
+
+function resetGuidedState(){
+  structures = ['Main Roof'];
+  currentStructure = 'Main Roof';
+  guidedData = {};
+  currentStepIndex = 0;
+  guidedMode = true;
+  var chk = document.getElementById('freeform-toggle');
+  if(chk) chk.checked = false;
+  rebuildStructureSelect();
+}
+
+function initGuidedForJob(){
+  rebuildStructureSelect();
+  var chk = document.getElementById('freeform-toggle');
+  if(chk) chk.checked = !guidedMode;
+  updateGuidedVisibility();
+  renderGuidedStep();
+}
+
 var CHECKLIST_ITEMS = {
   metal: [
     { id:'sheets', text:'Sheets (profile / condition)' },
@@ -1461,6 +1734,8 @@ function initPreInspect(){
             document.getElementById('pi-profile-group').style.display = val === 'metal' ? 'block' : 'none';
             document.getElementById('pi-tilebrand-group').style.display = (val === 'tile' || val === 'concrete-tile') ? 'block' : 'none';
             updateChecklistVisibility();
+            currentStepIndex = 0;
+            if(typeof renderGuidedStep === 'function') renderGuidedStep();
             if(typeof setRoofType === 'function'){
               setRoofType((val === 'tile' || val === 'concrete-tile') ? 'tile' : 'metal');
             }
@@ -1777,6 +2052,8 @@ function setType(t){
   if(checklistSec) checklistSec.style.display = isMakeSafe ? 'none' : '';
   updateEventDamageVisibility();
   if(typeof updateChecklistVisibility === 'function') updateChecklistVisibility();
+  if(typeof updateGuidedVisibility === 'function') updateGuidedVisibility();
+  if(typeof renderGuidedStep === 'function') renderGuidedStep();
 }
 
 function toggleEventRelated(){
@@ -2113,6 +2390,10 @@ function getJobData(){
     eventRelated: !!eventRelated,
     preInspectData: JSON.parse(JSON.stringify(preInspectData || {})),
     checklistState: JSON.parse(JSON.stringify(checklistState || { metal:{}, tile:{}, leak:{}, activeTab:'metal' })),
+    structures: (structures || []).slice(),
+    currentStructure: currentStructure,
+    guidedMode: !!guidedMode,
+    guidedData: JSON.parse(JSON.stringify(guidedData || {})),
     updatedAt: Date.now(),
     pdfGenerated: existing ? !!existing.pdfGenerated : false,
     completedAt: existing ? existing.completedAt : undefined,
@@ -2437,6 +2718,8 @@ function clearForm(){
   photos = [];
   restorePreInspect(null);
   restoreChecklist(null);
+  resetGuidedState();
+  initGuidedForJob();
   hideChecklistGaps();
   updateExportBtnVisibility();
   switchTab('import');
@@ -2483,6 +2766,12 @@ function openJob(id){
   updateRewriteVisibility();
   restorePreInspect(j.preInspectData);
   restoreChecklist(j.checklistState);
+  structures = (Array.isArray(j.structures) && j.structures.length) ? j.structures.slice() : ['Main Roof'];
+  currentStructure = j.currentStructure && structures.indexOf(j.currentStructure) !== -1 ? j.currentStructure : structures[0];
+  guidedData = j.guidedData && typeof j.guidedData === 'object' ? JSON.parse(JSON.stringify(j.guidedData)) : {};
+  guidedMode = (j.guidedMode === undefined) ? true : !!j.guidedMode;
+  currentStepIndex = 0;
+  initGuidedForJob();
   if(j.aiScope){ document.getElementById('sec-expanded').classList.add('on'); document.getElementById('sec-expanded').style.display='block'; }
   photos = [];
   photosLoaded = false;
