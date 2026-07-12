@@ -574,29 +574,6 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
       </div>
     </div>
 
-    <div class="sec" id="sec-checklist">
-      <div class="sechdr" onclick="toggleSec('sec-checklist')">
-        <div class="sechdr-l">
-          <span class="sectitle">Inspection Checklist</span>
-          <span id="checklist-progress" style="font-size:11px;color:#E8763A;font-family:'Barlow Condensed';font-weight:700;margin-left:8px">0 checked</span>
-        </div>
-        <span class="secarr">&#8964;</span>
-      </div>
-      <div class="secbody" id="secbody-checklist">
-        <div class="cl-tabrow" id="cl-tabs-roof" style="display:none">
-          <button type="button" class="cl-tabbtn on" id="cl-tab-metal-btn" onclick="switchChecklistTab('metal')">Metal</button>
-          <button type="button" class="cl-tabbtn" id="cl-tab-tile-btn" onclick="switchChecklistTab('tile')">Tile</button>
-        </div>
-        <div class="cl-pane on" id="cl-pane-metal" data-list="metal"></div>
-        <div class="cl-pane" id="cl-pane-tile" data-list="tile"></div>
-        <div class="cl-pane" id="cl-pane-leak" data-list="leak"></div>
-        <div class="cl-gaps" id="cl-gaps">
-          <div class="cl-gaps-title">Possible gaps in the transcript</div>
-          <div class="cl-gaps-body" id="cl-gaps-body"></div>
-        </div>
-      </div>
-    </div>
-
     <div class="sec" id="sec-guided">
       <div class="sechdr" onclick="toggleSec('sec-guided')">
         <div class="sechdr-l">
@@ -620,18 +597,19 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
           <div class="pi-label">Currently Inspecting</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <select id="current-structure" onchange="setCurrentStructure()"
-              style="background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;font-family:'Barlow Condensed';font-weight:700;font-size:14px;color:#1C1A18;text-transform:uppercase;letter-spacing:0.5px">
+              style="background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;font-family:'Barlow Condensed';font-weight:700;font-size:14px;color:#1C1A18;text-transform:uppercase;letter-spacing:0.5px;min-height:44px">
               <option value="Main Roof">Main Roof</option>
             </select>
-            <button class="sbtn" onclick="addStructure()" style="padding:8px 14px">+ Add Structure</button>
+            <button class="sbtn" onclick="addStructure()" style="padding:8px 14px;min-height:44px">+ Add</button>
+            <button class="sbtn" id="remove-structure-btn" onclick="removeStructure()" style="padding:8px 14px;min-height:44px" title="Remove current structure">Remove</button>
           </div>
         </div>
 
         <div id="guided-step" style="display:none"></div>
 
         <div id="freeform-area" style="display:none">
-          <div style="font-size:13px;color:#6B7280;text-align:center;padding:20px">
-            Freeform mode &mdash; record one continuous voice note covering everything.
+          <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:12px;font-size:13px;color:#92400E;line-height:1.5">
+            Freeform mode active &mdash; use the <strong>Voice Notes</strong> section below to record one continuous take covering everything.
           </div>
         </div>
 
@@ -726,6 +704,30 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
           <div style="font-size:12px;color:var(--muted)">Tap to select or drag and drop</div>
         </div>
         <div class="pgrid" id="photo-grid"></div>
+      </div>
+    </div>
+
+    <div class="sec shut" id="sec-checklist">
+      <div class="sechdr" onclick="toggleSec('sec-checklist')">
+        <div class="sechdr-l">
+          <span class="sectitle">Verification Checklist</span>
+          <span id="checklist-progress" style="font-size:11px;color:#E8763A;font-family:'Barlow Condensed';font-weight:700;margin-left:8px">0 checked</span>
+        </div>
+        <span class="secarr">&#8964;</span>
+      </div>
+      <div class="secbody" id="secbody-checklist">
+        <div id="guided-verify-summary" style="display:none;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#6B7280;font-family:'Barlow Condensed';font-weight:700;letter-spacing:0.3px"></div>
+        <div class="cl-tabrow" id="cl-tabs-roof" style="display:none">
+          <button type="button" class="cl-tabbtn on" id="cl-tab-metal-btn" onclick="switchChecklistTab('metal')">Metal</button>
+          <button type="button" class="cl-tabbtn" id="cl-tab-tile-btn" onclick="switchChecklistTab('tile')">Tile</button>
+        </div>
+        <div class="cl-pane on" id="cl-pane-metal" data-list="metal"></div>
+        <div class="cl-pane" id="cl-pane-tile" data-list="tile"></div>
+        <div class="cl-pane" id="cl-pane-leak" data-list="leak"></div>
+        <div class="cl-gaps" id="cl-gaps">
+          <div class="cl-gaps-title">Possible gaps in the transcript</div>
+          <div class="cl-gaps-body" id="cl-gaps-body"></div>
+        </div>
       </div>
     </div>
 
@@ -1468,6 +1470,87 @@ var currentStructure = 'Main Roof';
 var guidedMode = true;
 var guidedData = {};
 var currentStepIndex = 0;
+var lastGuidedCategory = null;
+
+function guidedToChecklistIds(guidedKey){
+  var listKey = (typeof activeChecklistKey === 'function') ? activeChecklistKey() : 'metal';
+  var maps = {
+    metal: {
+      sheets: ['sheets'],
+      flashings: ['flashings','flashing-joins'],
+      penetrations: ['penetrations'],
+      valleys: ['valleys'],
+      gutters: ['gutters-dp'],
+      event: ['hail-damage'],
+      fixings: ['screws-fixings'],
+      insulation: ['insulation']
+    },
+    tile: {
+      tiles: ['tile-cond','brand-photo'],
+      valleys: ['valley-cuts','valley-clips','valleys'],
+      bedding: ['bedding-pointing'],
+      ridge: ['ridge'],
+      penetrations: ['penetrations'],
+      gutters: ['gutters-dp'],
+      leadflashings: ['lead-flashings'],
+      sarking: ['sarking']
+    },
+    leak: {
+      entry: ['entry-point','water-path'],
+      affected: ['affected-areas','damage-extent'],
+      roofarea: ['roof-above','entry-flashings','entry-penetrations'],
+      general: [],
+      source: ['source-confirmed']
+    }
+  };
+  var m = maps[listKey] || {};
+  return { listKey: listKey, ids: m[guidedKey] || [] };
+}
+
+function autoTickChecklist(guidedKey){
+  var mapping = guidedToChecklistIds(guidedKey);
+  if(!mapping.ids.length) return;
+  if(!checklistState[mapping.listKey]) checklistState[mapping.listKey] = {};
+  mapping.ids.forEach(function(id){
+    checklistState[mapping.listKey][id] = true;
+    var el = document.querySelector('#cl-pane-'+mapping.listKey+' .cl-item[data-id="'+id+'"]');
+    if(el) el.classList.add('checked');
+  });
+  if(typeof updateChecklistProgress === 'function') updateChecklistProgress();
+}
+
+function hasAnyGuidedTranscripts(){
+  for(var s in guidedData){
+    if(!guidedData.hasOwnProperty(s)) continue;
+    var itemsMap = guidedData[s];
+    for(var k in itemsMap){
+      if(itemsMap.hasOwnProperty(k) && itemsMap[k] && itemsMap[k].transcript) return true;
+    }
+  }
+  return false;
+}
+
+function updateGuidedVerifySummary(){
+  var host = document.getElementById('guided-verify-summary');
+  if(!host) return;
+  var items = getActiveGuidedSet();
+  if(items.length === 0 || jtype === 'makesafe'){
+    host.style.display = 'none';
+    return;
+  }
+  host.style.display = 'block';
+  var covered = 0, skipped = 0, missing = 0;
+  structures.forEach(function(s){
+    items.forEach(function(item){
+      var d = (guidedData[s] && guidedData[s][item.key]) || {};
+      if(d.transcript) covered++;
+      else if(d.skipped) skipped++;
+      else missing++;
+    });
+  });
+  var total = items.length * structures.length;
+  host.textContent = covered + ' of ' + total + ' items covered · ' + skipped + ' skipped · ' + missing + ' not addressed';
+}
 
 function getActiveGuidedSet(){
   if(jtype === 'leak') return guidedItems.leak;
@@ -1489,6 +1572,23 @@ function rebuildStructureSelect(){
     currentStructure = structures[0] || 'Main Roof';
   }
   sel.value = currentStructure;
+  var rmBtn = document.getElementById('remove-structure-btn');
+  if(rmBtn) rmBtn.style.display = (structures.length > 1 && currentStructure !== 'Main Roof') ? 'inline-block' : 'none';
+}
+
+function removeStructure(){
+  if(structures.length <= 1) return;
+  if(currentStructure === 'Main Roof'){ showToast('Main Roof cannot be removed'); return; }
+  var name = currentStructure;
+  if(!confirm('Remove "' + name + '" and its guided recordings?')) return;
+  if(guidedData[name]) delete guidedData[name];
+  structures = structures.filter(function(s){ return s !== name; });
+  currentStructure = structures[0];
+  currentStepIndex = 0;
+  rebuildStructureSelect();
+  renderGuidedStep();
+  updateGuidedVerifySummary();
+  markEdited();
 }
 
 function setCurrentStructure(){
@@ -1496,6 +1596,8 @@ function setCurrentStructure(){
   if(!sel) return;
   currentStructure = sel.value;
   currentStepIndex = 0;
+  var rmBtn = document.getElementById('remove-structure-btn');
+  if(rmBtn) rmBtn.style.display = (structures.length > 1 && currentStructure !== 'Main Roof') ? 'inline-block' : 'none';
   renderGuidedStep();
   markEdited();
 }
@@ -1581,8 +1683,8 @@ function renderGuidedStep(){
       '<div style="font-family:\'Barlow Condensed\';font-weight:900;font-size:22px;color:#1C1A18;text-transform:uppercase;letter-spacing:-0.5px;margin-bottom:6px">' + esc(item.label) + '</div>' +
       '<div style="font-size:13px;color:#6B7280;line-height:1.5;margin-bottom:16px">' + esc(item.hint) + '</div>' +
       '<div style="display:flex;gap:8px;margin-bottom:14px">' +
-        '<button class="pbtn" style="flex:1;background:'+recordBg+'" onclick="recordGuidedItem()">' + recordLabel + '</button>' +
-        '<button class="sbtn" onclick="skipGuidedItem()">Skip</button>' +
+        '<button class="pbtn" style="flex:1;background:'+recordBg+';min-height:52px;font-size:16px" onclick="recordGuidedItem()">' + recordLabel + '</button>' +
+        '<button class="sbtn" style="min-height:52px;min-width:64px" onclick="skipGuidedItem()">Skip</button>' +
       '</div>' +
       statusPanel +
       '<div class="pi-label">Anything else?</div>' +
@@ -1591,13 +1693,16 @@ function renderGuidedStep(){
         'oninput="saveGuidedExtra()">' + esc(extraVal) + '</textarea>' +
     '</div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center">' +
-      '<button class="sbtn" onclick="prevGuidedStep()"' + (currentStepIndex === 0 ? ' disabled' : '') + '>Back</button>' +
+      '<button class="sbtn" style="min-height:44px;min-width:72px" onclick="prevGuidedStep()"' + (currentStepIndex === 0 ? ' disabled' : '') + '>Back</button>' +
       '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">' +
         '<span style="font-size:13px;color:#6B7280;font-family:\'Barlow Condensed\';font-weight:700">' + (currentStepIndex + 1) + ' of ' + items.length + '</span>' +
         '<a href="#" onclick="event.preventDefault();showGuidedReview()" style="font-size:11px;color:#E8763A;text-decoration:underline;font-family:\'Barlow Condensed\';text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Review all</a>' +
       '</div>' +
-      '<button class="sbtn" onclick="nextGuidedStep()">Next</button>' +
+      '<button class="sbtn" style="min-height:44px;min-width:72px" onclick="nextGuidedStep()">Next</button>' +
     '</div>';
+  if(jtype === 'roof'){
+    lastGuidedCategory = (preInspectData && (preInspectData.roofType === 'tile' || preInspectData.roofType === 'concrete-tile')) ? 'tile' : 'metal';
+  }
   updateGuidedProgress();
 }
 
@@ -1720,6 +1825,8 @@ async function transcribeGuidedItem(){
     guidedData[structure][itemKey].transcript = (text || '').trim();
     guidedData[structure][itemKey].skipped = false;
     markEdited();
+    autoTickChecklist(itemKey);
+    updateGuidedVerifySummary();
     var items = getActiveGuidedSet();
     var curItem = items[currentStepIndex];
     if(structure === currentStructure && curItem && curItem.key === itemKey){
@@ -1748,6 +1855,7 @@ function skipGuidedItem(){
   guidedData[currentStructure][item.key].transcript = '';
   showToast('Skipped ' + item.label);
   markEdited();
+  updateGuidedVerifySummary();
   nextGuidedStep();
 }
 
@@ -1877,6 +1985,7 @@ function updateGuidedProgress(){
   });
   var label = document.getElementById('guided-progress');
   if(label) label.textContent = done + ' / ' + total;
+  updateGuidedVerifySummary();
 }
 
 function resetGuidedState(){
@@ -1896,6 +2005,7 @@ function initGuidedForJob(){
   if(chk) chk.checked = !guidedMode;
   updateGuidedVisibility();
   renderGuidedStep();
+  updateGuidedVerifySummary();
 }
 
 var CHECKLIST_ITEMS = {
@@ -1966,6 +2076,10 @@ function initPreInspect(){
           preInspectData[groupKey] = btn.dataset.val;
           if(groupKey === 'roofType'){
             var val = btn.dataset.val;
+            var newCat = (val === 'tile' || val === 'concrete-tile') ? 'tile' : 'metal';
+            if(jtype === 'roof' && lastGuidedCategory && lastGuidedCategory !== newCat && hasAnyGuidedTranscripts()){
+              showToast('Roof type changed — guided items switched. Existing recordings kept by item key.');
+            }
             document.getElementById('pi-profile-group').style.display = val === 'metal' ? 'block' : 'none';
             document.getElementById('pi-tilebrand-group').style.display = (val === 'tile' || val === 'concrete-tile') ? 'block' : 'none';
             updateChecklistVisibility();
