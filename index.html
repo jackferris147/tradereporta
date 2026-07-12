@@ -1592,7 +1592,10 @@ function renderGuidedStep(){
     '</div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center">' +
       '<button class="sbtn" onclick="prevGuidedStep()"' + (currentStepIndex === 0 ? ' disabled' : '') + '>Back</button>' +
-      '<span style="font-size:13px;color:#6B7280;font-family:\'Barlow Condensed\';font-weight:700">' + (currentStepIndex + 1) + ' of ' + items.length + '</span>' +
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">' +
+        '<span style="font-size:13px;color:#6B7280;font-family:\'Barlow Condensed\';font-weight:700">' + (currentStepIndex + 1) + ' of ' + items.length + '</span>' +
+        '<a href="#" onclick="event.preventDefault();showGuidedReview()" style="font-size:11px;color:#E8763A;text-decoration:underline;font-family:\'Barlow Condensed\';text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Review all</a>' +
+      '</div>' +
       '<button class="sbtn" onclick="nextGuidedStep()">Next</button>' +
     '</div>';
   updateGuidedProgress();
@@ -1749,7 +1752,115 @@ function skipGuidedItem(){
 }
 
 function showGuidedReview(){
-  showToast('Review screen — coming in next update');
+  var items = getActiveGuidedSet();
+  var reviewEl = document.getElementById('guided-review');
+  var stepEl = document.getElementById('guided-step');
+  if(!reviewEl || !stepEl) return;
+  if(items.length === 0){
+    showToast('Nothing to review');
+    return;
+  }
+  stepEl.style.display = 'none';
+  reviewEl.style.display = 'block';
+
+  var html = '<div style="font-family:\'Barlow Condensed\';font-weight:900;font-size:20px;color:#1C1A18;text-transform:uppercase;margin-bottom:4px">Review</div>' +
+    '<div style="font-size:12px;color:#6B7280;margin-bottom:16px">Check everything is captured before generating the report.</div>';
+
+  structures.forEach(function(structure){
+    html += '<div style="font-family:\'Barlow Condensed\';font-weight:700;font-size:14px;color:#E8763A;text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px">' + esc(structure) + '</div>';
+    items.forEach(function(item){
+      var d = (guidedData[structure] && guidedData[structure][item.key]) || {};
+      var status, color, detail;
+      if(d.transcript){
+        status = '&#10003;'; color = '#16A34A';
+        var t = d.transcript;
+        detail = esc(t.slice(0, 80)) + (t.length > 80 ? '…' : '');
+      } else if(d.skipped){
+        status = '&#8211;'; color = '#9CA3AF'; detail = 'Skipped';
+      } else {
+        status = '!'; color = '#D97706'; detail = 'Not recorded';
+      }
+      html += '<div onclick="jumpToGuidedItem(\'' + encodeURIComponent(structure) + '\',\'' + item.key + '\')" ' +
+        'style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #F3F4F6;cursor:pointer">' +
+        '<span style="color:' + color + ';font-weight:700;flex-shrink:0">' + status + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13px;font-weight:600;color:#1C1A18">' + esc(item.label) + '</div>' +
+          '<div style="font-size:12px;color:#6B7280;line-height:1.4">' + detail + '</div>' +
+        '</div></div>';
+    });
+  });
+
+  var gaps = 0;
+  structures.forEach(function(s){
+    items.forEach(function(item){
+      var d = (guidedData[s] && guidedData[s][item.key]) || {};
+      if(!d.transcript && !d.skipped) gaps++;
+    });
+  });
+  if(gaps > 0){
+    html += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:12px;margin-top:14px;font-size:13px;color:#92400E">' +
+      '&#9888; ' + gaps + ' item' + (gaps>1?'s':'') + ' not yet recorded or skipped.</div>';
+  }
+
+  html += '<button class="aibtn" style="width:100%;margin-top:16px" onclick="generateReportFromGuided()">&#10022; Generate Report</button>' +
+    '<button class="sbtn" style="width:100%;margin-top:8px" onclick="backToGuidedSteps()">Back to Steps</button>';
+
+  reviewEl.innerHTML = html;
+  updateGuidedProgress();
+}
+
+function jumpToGuidedItem(structureEnc, itemKey){
+  var structure;
+  try { structure = decodeURIComponent(structureEnc); } catch(e){ structure = structureEnc; }
+  var sel = document.getElementById('current-structure');
+  if(sel && structures.indexOf(structure) !== -1){
+    sel.value = structure;
+    currentStructure = structure;
+  }
+  var items = getActiveGuidedSet();
+  var idx = items.findIndex(function(i){ return i.key === itemKey; });
+  if(idx >= 0) currentStepIndex = idx;
+  var reviewEl = document.getElementById('guided-review');
+  if(reviewEl) reviewEl.style.display = 'none';
+  renderGuidedStep();
+}
+
+function backToGuidedSteps(){
+  var reviewEl = document.getElementById('guided-review');
+  if(reviewEl) reviewEl.style.display = 'none';
+  renderGuidedStep();
+}
+
+function buildGuidedTranscript(){
+  var items = getActiveGuidedSet();
+  if(!items.length) return '';
+  var lines = [];
+  structures.forEach(function(structure){
+    var structureLines = [];
+    items.forEach(function(item){
+      var d = (guidedData[structure] && guidedData[structure][item.key]) || {};
+      if(d.skipped) return;
+      var t = (d.transcript || '').trim();
+      var x = (d.extra || '').trim();
+      if(!t && !x) return;
+      var content = t;
+      if(x) content += (content ? ' ' : '') + x;
+      structureLines.push(item.label + ': ' + content);
+    });
+    if(structureLines.length){
+      lines.push('=== ' + structure + ' ===');
+      lines.push(structureLines.join('\n'));
+    }
+  });
+  return lines.join('\n\n');
+}
+
+function generateReportFromGuided(){
+  if(jtype === 'makesafe'){ showToast('Make Safe uses freeform recording'); return; }
+  var transcript = buildGuidedTranscript();
+  if(!transcript.trim()){ showToast('Nothing recorded yet - record or skip items first'); return; }
+  setPill('expand-status','Generating report...','work');
+  runReportGen(transcript, { source: 'guided' }).catch(function(){});
 }
 
 function updateGuidedProgress(){
@@ -3151,7 +3262,9 @@ function generateReportFromTranscript(){
   }).catch(function(e){ setPill('voice-status','Error: '+e.message,'err'); });
 }
 
-function runReportGen(transcript){
+function runReportGen(transcript, opts){
+  opts = opts || {};
+  var isGuidedInput = opts.source === 'guided';
   var clean = (transcript||'').replace(/[\u2018\u2019\u201C\u201D\u2022]/g,"'").replace(/\*/g,'-').trim();
   if(!clean){ showToast('No content to expand'); return Promise.reject(new Error('Empty input')); }
   busy = true;
@@ -3169,6 +3282,13 @@ function runReportGen(transcript){
   }
   if(clCtx){
     contextBlock += 'The following checklist items were confirmed inspected on site. Only describe these items in the report; do NOT fabricate details about items that were not inspected.\n\n' + clCtx + '\n\n';
+  }
+  if(isGuidedInput){
+    contextBlock += 'GUIDED INPUT NOTES:\n' +
+      'The transcript below came from a guided per-item inspection. It is organised by structure using "=== Structure Name ===" headers, with each inspection item labelled beneath (e.g. "Sheets:", "Flashings:", "Gutters & Downpipes:").\n' +
+      '- Group findings BY STRUCTURE in the Findings section. When items relate to a non-main structure (e.g. Garage, Rear Carport, Shed), include the structure name in the Area column so it reads as separate rows (e.g. "Ridge Cap - Main Roof", "Sheets - Rear Carport Awning"). For items on the main structure only, structure name is optional.\n' +
+      '- Information from any labelled item can flow into Findings, Event Damage, or Maintenance wherever it gives useful context - do not treat labels as rigid section mappings.\n' +
+      '- Skipped items are omitted entirely from the transcript. Do NOT invent details for items that are not present.\n\n';
   }
   var userMsg = 'Inspection type: ' + typeLbl + ' | Address: ' + addr + '\n\n' + contextBlock + 'Transcript:\n' + clean;
   return callAI({
