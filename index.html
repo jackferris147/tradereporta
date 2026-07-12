@@ -88,6 +88,9 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .jcard-del:hover{color:#DC2626}
 .jcard-reopen{display:inline-block;margin-top:10px;background:transparent;border:1px solid #E5E7EB;border-radius:6px;color:#6B7280;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.5px;text-transform:uppercase;padding:6px 12px;cursor:pointer}
 .jcard-reopen:hover{border-color:#E8763A;color:#E8763A}
+.jcard-qactions{display:flex;gap:8px;margin-top:10px}
+.jcard-qaction{display:inline-flex;align-items:center;gap:5px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:0.5px;text-transform:uppercase;color:#6B7280;text-decoration:none;padding:6px 12px;border:1px solid #E5E7EB;border-radius:6px;transition:all 0.15s;-webkit-tap-highlight-color:transparent}
+.jcard-qaction:hover{border-color:#E8763A;color:#E8763A}
 .jprogress{height:3px;background:#F3F4F6;border-radius:2px;overflow:hidden;margin-top:10px;width:100%}
 .jprogress-bar{height:100%;background:#E8763A;transition:width 0.2s}
 .jprogress-label{display:none}
@@ -2274,6 +2277,24 @@ function renderJobCard(j, sectionKey){
   }
   if(dateText) html += '<span class="jcard-date">'+dateText+'</span>';
   html += '</div>';
+  var phoneRaw = (j.custphone || '').trim();
+  var addressRaw = (j.address || '').trim();
+  if(phoneRaw || addressRaw){
+    html += '<div class="jcard-qactions" onclick="event.stopPropagation()">';
+    if(phoneRaw){
+      var telHref = 'tel:' + phoneRaw.replace(/\s/g, '');
+      html += '<a class="jcard-qaction" href="'+telHref+'" title="Call contact">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
+        'Call</a>';
+    }
+    if(addressRaw){
+      var mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addressRaw);
+      html += '<a class="jcard-qaction" href="'+mapsUrl+'" target="_blank" rel="noopener noreferrer" title="Directions">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
+        'Directions</a>';
+    }
+    html += '</div>';
+  }
   if(sectionKey === 'inprogress'){
     var pct = jobProgress(j);
     html += '<div class="jprogress"><div class="jprogress-bar" style="width:'+pct+'%"></div></div>';
