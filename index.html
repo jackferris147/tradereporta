@@ -200,6 +200,8 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .preview-heading{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:transparent;border:1px solid #E8763A;color:#E8763A;padding:5px 10px;border-radius:4px;margin-bottom:10px}
 .preview-body{font-size:15px;line-height:1.6;color:#1C1A18;white-space:pre-wrap;padding:0 4px}
 .preview-body.empty{color:#7A7570;font-style:italic}
+.preview-subheading{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#1C1A18;margin:14px 0 6px;padding:0 4px}
+.preview-subheading:first-child{margin-top:4px}
 .preview-table{width:100%;border-collapse:collapse;margin-top:6px}
 .preview-table th{background:#1C1A18;color:#F4F2EE;font-family:'Barlow Condensed',sans-serif;font-size:11px;text-align:left;padding:8px 12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase}
 .preview-table td{background:#FFFFFF;font-size:14px;padding:10px 12px;border:1px solid #E2DDD8;color:#1C1A18;vertical-align:top;line-height:1.5}
@@ -459,6 +461,22 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
       </div>
     </div>
 
+    <div class="pi-group" id="event-toggle-row" style="margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+        <input type="checkbox" id="event-related"
+          style="width:20px;height:20px;accent-color:#E8763A"
+          onchange="toggleEventRelated()">
+        <div>
+          <div style="font-family:'Barlow Condensed';font-weight:700;
+            font-size:14px;color:#1C1A18;text-transform:uppercase;
+            letter-spacing:0.5px">Event-Related Inspection</div>
+          <div style="font-size:12px;color:#6B7280">
+            Tick for storm, hail or damage claims. Adds Event Damage section.
+          </div>
+        </div>
+      </label>
+    </div>
+
     <div class="sec" id="sec-details">
       <div class="sechdr" onclick="toggleSec('sec-details')">
         <div class="sechdr-l"><span class="sectitle">Job Details</span></div>
@@ -631,8 +649,9 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
         <div class="fld" style="margin-bottom:12px"><label>Scope of Works</label><textarea id="ai-scope" class="lg"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Findings (Area | Observation | Photos &mdash; one per line)</label><textarea id="ai-findings" style="min-height:130px;background:#F7F5F2;border:1px solid #E2DDD8;border-radius:6px;color:#1C1A18;font-family:'Barlow',sans-serif;font-size:14px;padding:9px 12px;width:100%;resize:vertical;line-height:1.5;outline:none"></textarea></div>
         <div class="fld" id="ai-entry-wrap" style="margin-bottom:12px;display:none"><label>Point of Water Entry</label><textarea id="ai-entry"></textarea></div>
-        <div class="fld" style="margin-bottom:12px"><label>Maintenance Items</label><textarea id="ai-maint" placeholder="Maintenance issues found, claim relation, likely duration..."></textarea></div>
-        <div class="fld" style="margin-bottom:12px"><label>Causation</label><textarea id="ai-causation" class="lg"></textarea></div>
+        <div class="fld" id="ai-event-damage-wrap" style="margin-bottom:12px;display:none"><label>Event Damage</label><textarea id="ai-event-damage" class="lg" placeholder="Storm, hail or impact damage found during inspection..."></textarea></div>
+        <div class="fld" style="margin-bottom:12px"><label>Maintenance Items</label><textarea id="ai-maint" placeholder="Maintenance items found on site..."></textarea></div>
+        <div class="fld" id="ai-causation-wrap" style="margin-bottom:12px"><label>Causation</label><textarea id="ai-causation" class="lg"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Recommendations (Priority: Action &mdash; one per line)</label><textarea id="ai-recs"></textarea></div>
         <div class="fld" style="margin-bottom:12px"><label>Conclusion</label><textarea id="ai-conclusion" class="lg"></textarea></div>
       </div>
@@ -698,6 +717,7 @@ var jobs = (function(){
   } catch(e){ return []; }
 })();
 var cid = null, jtype = 'roof', photos = [], busy = false, photosLoaded = false;
+var eventRelated = false;
 var pdfBlobCache = { jobId: null, blob: null };
 var mrec = null, achunks = [], rtimer = null, rsecs = 0;
 var audioBlob = null, audioURL = null;
@@ -711,7 +731,88 @@ var SUPA_URL = 'https://tvkhsmxnhqkpgpkpllax.supabase.co';
 var SUPA_KEY = 'sb_publishable_8unqhQp-FFzkjd6Mjy4lPQ_i47Syanq';
 var supa = null;
 var WHISPER_VOCAB = 'Roofing inspection report. Terms include: ridge cap, valley flashing, barge capping, head capping, sarking, battens, fascia, eaves, downpipe, box gutter, colorbond, decramastic, terracotta, mortar, repointing, silicone, flashing, membrane, skylights, penetrations, leaf guard';
-var REPORT_SYSTEM_PROMPT = "You are a professional report writer for JFR Roofing, a Gold Coast based roofing specialist.\n\nWrite as an experienced Australian roofing tradesman explaining findings to an insurance assessor or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.\n\nSTRICT RULES:\n- Keep the report concise and professional. A good report is complete but not padded. Aim for clarity over length.\n- The report must read smoothly and professionally from start to finish. Read each section back as if you are the inspector. If a sentence feels clunky, awkward or overly technical rewrite it. Every sentence should flow naturally.\n- Never add bracketed explanations after technical terms. Use the correct technical term only. Do not write 'Trimdeck sheeting (ribbed metal roof sheeting)' - just write 'Trimdeck sheeting'.\n- Each section must contain ONLY information relevant to that section\n- Never repeat the same information within a section\n- Repetition across sections is expected and fine - findings will naturally appear in causation and maintenance\n- Use judgement on detail. Not every finding needs the same level of explanation. A minor item needs one clear sentence. A significant defect related to the claim needs more context. Write what is needed to clearly communicate - no more, no less.\n- Findings: Group related findings together under one row. Do not create separate rows for different aspects of the same component.\nExamples of correct grouping:\n- Air con penetration + Deckite flashing around it = ONE row\n- Skylight + Deckite flashing + fixings = ONE row\n- Rusted fixings + loose fixings + general fixing condition = ONE row\n- Multiple penetrations in similar condition = ONE row\nOnly create separate rows when findings are genuinely distinct defects in different locations, or when hail damage is involved (hail damage always gets its own row as it is a primary insurance claim item), or when you specifically call something out as a major or serious issue.\nKeep each finding to one clear sentence describing what was found and where. Only add severity or context when it is significant or directly relevant to the claim.\nThe Area column should clearly identify the component - for example 'Ridge Cap', 'Box Gutter', 'Air Con Penetration', 'Trimdeck Sheeting'. Only include location (North, Rear, East etc) when it is relevant or when there are multiple of the same component in different locations. Keep area headings clean and simple.\n- Causation: why the issues happened, reference findings by area rather than repeating them word for word\n- Maintenance: List maintenance issues found during the inspection as clear dot points, one issue per dot point. For each item state what was found and where. Only mention how long it has been present when it is clearly relevant - for example when it relates to an insurance claim timeline or when the duration is obvious from the condition. Do not make judgements about whether the owner would or would not have been aware. Do not include recommendations here - only describe what was found. If no maintenance issues were found write exactly: No maintenance issues were identified during the inspection.\n- Recommendations: each priority row should be 1-2 sentences describing specific work and its purpose. Do not repeat causation\n- Conclusion: brief summary only, one paragraph, no new information\n\nOUTPUT FORMAT - respond with exactly these tags, no other text:\n[SCOPE] one or two sentences starting with 'As requested, JFR Roofing attended site to...'\n[FINDINGS] one finding per line in format: Area | Observation. Group related issues under one row. Keep observations concise - one clear sentence unless additional detail is genuinely needed.\n[CAUSATION] two paragraphs maximum starting with 'Based on our inspection, it is the opinion of JFR Roofing that...'\n[MAINTENANCE] clear dot points describing each maintenance issue found - what was found and where, plus duration only when clearly relevant; or the sentence 'No maintenance issues were identified during the inspection'\n[RECOMMENDATIONS]\nImmediate: 1-2 sentences describing urgent action and its purpose (e.g. 'All hail-damaged broken tiles should be identified and replaced across the full roof surface to stop ongoing water entry.'), or Nil\nMaintenance: 1-2 sentences describing planned maintenance work (e.g. 'Valley clips should be installed on the small valley tiles during the tile replacement works. Gutters to be cleared at the same time.'), or Nil\nMonitor: 1-2 sentences describing what to monitor after repairs (e.g. 'Once repairs are completed, internal ceiling areas should be monitored for any further signs of moisture to confirm the source has been fully resolved.'), or Nil\n[CONCLUSION] one paragraph starting with 'JFR Roofing has...'";
+function buildReportSystemPrompt(jt, evt, brandCompany){
+  var C = brandCompany || 'JFR Roofing';
+  var isLeak = jt === 'leak';
+  var isEvent = !isLeak && !!evt;
+
+  var lines = [];
+  lines.push("You are a professional report writer for " + C + ", a Gold Coast based roofing specialist.");
+  lines.push("");
+  if(isLeak){
+    lines.push("Write as an experienced Australian roofing tradesman explaining findings to an insurance assessor or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.");
+  } else if(isEvent){
+    lines.push("Write as an experienced Australian roofing tradesman explaining findings from an inspection following a specific damage event (storm, hail, impact). The audience may be an insurance assessor, strata manager or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.");
+  } else {
+    lines.push("Write as an experienced Australian roofing tradesman documenting the condition of the roof for the property manager or owner. The report should suit any client (insurance, strata, private). Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.");
+  }
+  lines.push("");
+  lines.push("STRICT RULES:");
+  lines.push("- Keep the report concise and professional. A good report is complete but not padded. Aim for clarity over length.");
+  lines.push("- The report must read smoothly and professionally from start to finish. Read each section back as if you are the inspector. If a sentence feels clunky, awkward or overly technical rewrite it. Every sentence should flow naturally.");
+  lines.push("- Never add bracketed explanations after technical terms. Use the correct technical term only. Do not write 'Trimdeck sheeting (ribbed metal roof sheeting)' - just write 'Trimdeck sheeting'.");
+  lines.push("- Each section must contain ONLY information relevant to that section.");
+  lines.push("- Never repeat the same information within a section.");
+  if(isLeak || isEvent){
+    lines.push("- Repetition across sections is expected and fine - findings will naturally appear in causation and maintenance.");
+  } else {
+    lines.push("- This is a general roof condition assessment. Do NOT use insurance or claim language. Do NOT speculate about cause of damage, insured awareness, or contributing factors. Simply document what was observed.");
+  }
+  var significanceCtx = isLeak ? ' related to the claim' : (isEvent ? ' related to the damage event' : '');
+  lines.push("- Use judgement on detail. Not every finding needs the same level of explanation. A minor item needs one clear sentence. A significant defect" + significanceCtx + " needs more context. Write what is needed to clearly communicate - no more, no less.");
+  lines.push("- Findings: Group related findings together under one row. Do not create separate rows for different aspects of the same component.");
+  lines.push("Examples of correct grouping:");
+  lines.push("- Air con penetration + Deckite flashing around it = ONE row");
+  lines.push("- Skylight + Deckite flashing + fixings = ONE row");
+  lines.push("- Rusted fixings + loose fixings + general fixing condition = ONE row");
+  lines.push("- Multiple penetrations in similar condition = ONE row");
+  if(isEvent){
+    lines.push("Only create separate rows when findings are genuinely distinct defects in different locations, or when hail damage is involved (hail damage always gets its own row as it is a primary claim item), or when you specifically call something out as a major or serious issue.");
+    lines.push("Keep each finding to one clear sentence describing what was found and where. Only add severity or context when it is significant or directly relevant to the claim.");
+  } else {
+    lines.push("Only create separate rows when findings are genuinely distinct defects in different locations, or when you specifically call something out as a major or serious issue.");
+    lines.push("Keep each finding to one clear sentence describing what was found and where. Only add severity or context when it is significant.");
+  }
+  lines.push("The Area column should clearly identify the component - for example 'Ridge Cap', 'Box Gutter', 'Air Con Penetration', 'Trimdeck Sheeting'. Only include location (North, Rear, East etc) when it is relevant or when there are multiple of the same component in different locations. Keep area headings clean and simple.");
+  if(isLeak){
+    lines.push("- Causation: why the issues happened, reference findings by area rather than repeating them word for word.");
+  }
+  if(isEvent){
+    lines.push("- Event Damage: describe the damage caused by the specific event (storm, hail, impact). Two paragraphs maximum. Focus on the nature and extent of the damage found. Do NOT list unrelated maintenance items here.");
+    lines.push("- Maintenance: Split into two groups using the EXACT sub-headings 'Contributing to Damage:' and 'General Observations:'. Under each sub-heading, list items as clear dot points, one per line, using the same style as a standard maintenance list.");
+    lines.push("  - Contributing to Damage: items that made the event damage worse or allowed it to happen. For each item state what was found and where, how long it has likely been present (based on visible condition), whether the insured would reasonably have been aware of it, and what damage it contributed to.");
+    lines.push("  - General Observations: pre-existing or unrelated maintenance items. For each state what was found and where. Only mention duration when clearly relevant.");
+    lines.push("  If a sub-heading has no items, omit that sub-heading and its label entirely.");
+  } else if(isLeak){
+    lines.push("- Maintenance: List maintenance issues found during the inspection as clear dot points, one issue per dot point. For each item state what was found and where. Only mention how long it has been present when it is clearly relevant. Do not make judgements about whether the owner would or would not have been aware. Do not include recommendations here - only describe what was found. If no maintenance issues were found write exactly: No maintenance issues were identified during the inspection.");
+  } else {
+    lines.push("- Maintenance: List maintenance items found during the inspection as clear dot points, one item per dot point. For each item state what was found and where. Do NOT speculate about cause, insured awareness, or contributing factors. Do not include recommendations here - only describe what was found. If no maintenance items were found write exactly: No maintenance items were identified during the inspection.");
+  }
+  var recRepeat = isLeak ? 'causation' : (isEvent ? 'event damage descriptions' : 'findings');
+  lines.push("- Recommendations: each priority row should be 1-2 sentences describing specific work and its purpose. Do not repeat " + recRepeat + ".");
+  lines.push("- Conclusion: brief summary only, one paragraph, no new information." + ((!isLeak && !isEvent) ? " Do not use insurance or claim language." : ""));
+  lines.push("");
+  lines.push("OUTPUT FORMAT - respond with exactly these tags, no other text:");
+  lines.push("[SCOPE] one or two sentences starting with 'As requested, " + C + " attended site to...'");
+  lines.push("[FINDINGS] one finding per line in format: Area | Observation. Group related issues under one row. Keep observations concise - one clear sentence unless additional detail is genuinely needed.");
+  if(isLeak){
+    lines.push("[ENTRY] one sentence describing where water is entering the building.");
+    lines.push("[CAUSATION] two paragraphs maximum starting with 'Based on our inspection, it is the opinion of " + C + " that...'");
+    lines.push("[MAINTENANCE] clear dot points describing each maintenance issue found - what was found and where, plus duration only when clearly relevant; or the sentence 'No maintenance issues were identified during the inspection'");
+  } else if(isEvent){
+    lines.push("[EVENT_DAMAGE] two paragraphs maximum describing the specific event damage (storm, hail, impact) found during the inspection.");
+    lines.push("[MAINTENANCE] Split into sub-headings. Use the exact labels 'Contributing to Damage:' and 'General Observations:' each on their own line, followed by dot-point items on subsequent lines. Omit a sub-heading entirely if it has no items. If neither category has any items, write exactly: 'No maintenance items were identified during the inspection.'");
+  } else {
+    lines.push("[MAINTENANCE] clear dot points describing each maintenance item found - what was found and where; or the sentence 'No maintenance items were identified during the inspection'");
+  }
+  lines.push("[RECOMMENDATIONS]");
+  lines.push("Immediate: 1-2 sentences describing urgent action and its purpose, or Nil");
+  lines.push("Maintenance: 1-2 sentences describing planned maintenance work, or Nil");
+  lines.push("Monitor: 1-2 sentences describing what to monitor after repairs, or Nil");
+  lines.push("[CONCLUSION] one paragraph starting with '" + C + " has...'");
+  return lines.join("\n");
+}
+
 var EDIT_SYSTEM_PROMPT = "You are editing a roofing inspection report. You will receive the current report sections and an edit instruction. Make only the specific change requested. Do not change anything else. Return ALL sections in the original tag format even if unchanged.";
 
 var idb = null;
@@ -1605,7 +1706,25 @@ function setType(t){
   document.getElementById('type-roof').classList.toggle('sel', t==='roof');
   document.getElementById('type-leak').classList.toggle('sel', t==='leak');
   document.getElementById('ai-entry-wrap').style.display = t==='leak'?'block':'none';
+  var evRow = document.getElementById('event-toggle-row');
+  if(evRow) evRow.style.display = t==='leak' ? 'none' : 'block';
+  var causWrap = document.getElementById('ai-causation-wrap');
+  if(causWrap) causWrap.style.display = t==='leak' ? 'block' : 'none';
+  updateEventDamageVisibility();
   if(typeof updateChecklistVisibility === 'function') updateChecklistVisibility();
+}
+
+function toggleEventRelated(){
+  eventRelated = document.getElementById('event-related').checked;
+  updateEventDamageVisibility();
+  markEdited();
+  if(typeof saveJobsStore === 'function' && cid) saveJob();
+}
+
+function updateEventDamageVisibility(){
+  var wrap = document.getElementById('ai-event-damage-wrap');
+  if(!wrap) return;
+  wrap.style.display = (jtype !== 'leak' && eventRelated) ? 'block' : 'none';
 }
 
 function setPill(id, msg, type){
@@ -1923,7 +2042,9 @@ function getJobData(){
     transcript: document.getElementById('transcript').textContent || '',
     aiScope:g('ai-scope'), aiFindings:g('ai-findings'), aiEntry:g('ai-entry'),
     aiCausation:g('ai-causation'), aiMaint:g('ai-maint'),
+    aiEventDamage:g('ai-event-damage'),
     aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion'),
+    eventRelated: !!eventRelated,
     preInspectData: JSON.parse(JSON.stringify(preInspectData || {})),
     checklistState: JSON.parse(JSON.stringify(checklistState || { metal:{}, tile:{}, leak:{}, activeTab:'metal' })),
     updatedAt: Date.now(),
@@ -2174,8 +2295,12 @@ function renderJobs(){
 function clearForm(){
   var flds = ['client','ref','cm','cmemail','insurer','insurerref','customer','custphone','address','inspector','weather','roofmat','notes'];
   flds.forEach(function(f){ sv('f-'+f,''); });
-  var ais = ['scope','findings','entry','causation','maint','recs','conclusion'];
+  var ais = ['scope','findings','entry','event-damage','causation','maint','recs','conclusion'];
   ais.forEach(function(f){ sv('ai-'+f,''); });
+  eventRelated = false;
+  var evChk = document.getElementById('event-related');
+  if(evChk) evChk.checked = false;
+  updateEventDamageVisibility();
   sv('f-date', new Date().toISOString().split('T')[0]);
   sv('f-method','Walk Over - Internal & External');
   sv('wo-text','');
@@ -2225,8 +2350,13 @@ function openJob(id){
   sv('f-roofmat',j.roofmat); sv('f-notes',j.notes);
   sv('ai-scope',j.aiScope); sv('ai-findings',j.aiFindings); sv('ai-entry',j.aiEntry);
   sv('ai-causation',j.aiCausation);
+  sv('ai-event-damage', j.aiEventDamage || '');
   sv('ai-maint', j.aiMaint || [j.aiMaintExisting, j.aiMaintRecommended].filter(Boolean).join('\n\n') || '');
   sv('ai-recs',j.aiRecs); sv('ai-conclusion',j.aiConclusion);
+  eventRelated = !!j.eventRelated;
+  var evChk = document.getElementById('event-related');
+  if(evChk) evChk.checked = eventRelated;
+  updateEventDamageVisibility();
   if(j.transcript){
     document.getElementById('transcript').textContent = j.transcript;
     document.getElementById('transcript-wrap').style.display = 'block';
@@ -2447,15 +2577,9 @@ function runReportGen(transcript){
   document.getElementById('gen-btn').disabled = true;
   setPill('expand-status','AI writing your report sections...','work');
   var addr = g('f-address') || 'the property';
-  var typeLbl = jtype === 'leak' ? 'leak' : 'roof';
+  var typeLbl = jtype === 'leak' ? 'leak' : (eventRelated ? 'event-related roof' : 'roof');
   var brandCompany = getBrand().company || 'JFR Roofing';
-  var systemPrompt = REPORT_SYSTEM_PROMPT.replace(/JFR Roofing/g, brandCompany);
-  if(jtype === 'leak'){
-    systemPrompt = systemPrompt.replace(
-      "[CAUSATION] two paragraphs",
-      "[ENTRY] one sentence describing where water is entering the building.\n[CAUSATION] two paragraphs"
-    );
-  }
+  var systemPrompt = buildReportSystemPrompt(jtype, eventRelated, brandCompany);
   var preCtx = (typeof buildPreInspectContext === 'function') ? buildPreInspectContext() : '';
   var clCtx = (typeof buildChecklistContext === 'function') ? buildChecklistContext() : '';
   var contextBlock = '';
@@ -2483,7 +2607,9 @@ function runReportGen(transcript){
       return (next===-1?text.substring(from):text.substring(from,next)).trim();
     }
     sv('ai-scope',ex('SCOPE')); sv('ai-findings',ex('FINDINGS')); sv('ai-entry',ex('ENTRY'));
-    sv('ai-causation',ex('CAUSATION')); sv('ai-maint',ex('MAINTENANCE'));
+    sv('ai-causation',ex('CAUSATION'));
+    sv('ai-event-damage', ex('EVENT_DAMAGE'));
+    sv('ai-maint',ex('MAINTENANCE'));
     sv('ai-recs',ex('RECOMMENDATIONS')); sv('ai-conclusion',ex('CONCLUSION'));
     document.getElementById('sec-expanded').classList.add('on');
     document.getElementById('sec-expanded').style.display = 'block';
@@ -2545,11 +2671,18 @@ function applyEdit(){
   var instr = document.getElementById('edit-text').value.trim();
   if(!instr){ showToast('Type or speak an edit instruction first'); return; }
   var order = ['SCOPE','FINDINGS'];
-  if(jtype === 'leak') order.push('ENTRY');
-  order = order.concat(['CAUSATION','MAINTENANCE','RECOMMENDATIONS','CONCLUSION']);
+  if(jtype === 'leak'){
+    order.push('ENTRY','CAUSATION','MAINTENANCE');
+  } else if(eventRelated){
+    order.push('EVENT_DAMAGE','MAINTENANCE');
+  } else {
+    order.push('MAINTENANCE');
+  }
+  order.push('RECOMMENDATIONS','CONCLUSION');
   var fieldMap = {
     SCOPE:'ai-scope', FINDINGS:'ai-findings', ENTRY:'ai-entry',
     CAUSATION:'ai-causation', MAINTENANCE:'ai-maint',
+    EVENT_DAMAGE:'ai-event-damage',
     RECOMMENDATIONS:'ai-recs', CONCLUSION:'ai-conclusion'
   };
   var currentBlock = order.map(function(tag){
@@ -2696,14 +2829,79 @@ function previewSections(){
     { key:'ai-scope',      label:'Scope of Works',  type:'text' },
     { key:'ai-findings',   label:'Findings',        type:'findings' }
   ];
-  if(jtype === 'leak' && (g('ai-entry')||'').trim()){
-    arr.push({ key:'ai-entry', label:'Point of Water Entry', type:'text' });
+  if(jtype === 'leak'){
+    if((g('ai-entry')||'').trim()){
+      arr.push({ key:'ai-entry', label:'Point of Water Entry', type:'text' });
+    }
+    arr.push({ key:'ai-maint',     label:'Maintenance',       type:'text' });
+    arr.push({ key:'ai-causation', label:'Causation',         type:'text' });
+  } else {
+    if(eventRelated && (g('ai-event-damage')||'').trim()){
+      arr.push({ key:'ai-event-damage', label:'Event Damage', type:'text' });
+    }
+    arr.push({ key:'ai-maint', label:'Maintenance', type:'maintenance' });
   }
-  arr.push({ key:'ai-maint',     label:'Maintenance',       type:'text' });
-  arr.push({ key:'ai-causation', label:'Causation',         type:'text' });
   arr.push({ key:'ai-recs',      label:'Recommendations',   type:'recs' });
   arr.push({ key:'ai-conclusion',label:'Conclusion',        type:'text' });
   return arr;
+}
+
+function parseMaintenanceSubHeadings(text){
+  var t = (text || '').trim();
+  if(!t) return { contributing:'', general:'', hasHeadings:false, all:'' };
+  var CONTRIB_LABEL = 'Contributing to Damage:';
+  var GENERAL_LABEL = 'General Observations:';
+  var lower = t.toLowerCase();
+  var ci = lower.indexOf(CONTRIB_LABEL.toLowerCase());
+  var gi = lower.indexOf(GENERAL_LABEL.toLowerCase());
+  if(ci === -1 && gi === -1) return { contributing:'', general:'', hasHeadings:false, all:t };
+  var contrib = '', general = '';
+  function slice(startIdx, labelLen, endIdx){
+    var from = startIdx + labelLen;
+    var to = (endIdx === -1 || endIdx == null) ? t.length : endIdx;
+    return t.substring(from, to).trim();
+  }
+  if(ci !== -1 && gi !== -1){
+    if(ci < gi){
+      contrib = slice(ci, CONTRIB_LABEL.length, gi);
+      general = slice(gi, GENERAL_LABEL.length, -1);
+    } else {
+      general = slice(gi, GENERAL_LABEL.length, ci);
+      contrib = slice(ci, CONTRIB_LABEL.length, -1);
+    }
+  } else if(ci !== -1){
+    contrib = slice(ci, CONTRIB_LABEL.length, -1);
+  } else {
+    general = slice(gi, GENERAL_LABEL.length, -1);
+  }
+  return { contributing:contrib, general:general, hasHeadings:true, all:t };
+}
+
+function renderMaintenanceBody(text){
+  var parsed = parseMaintenanceSubHeadings(text);
+  var trimmed = (text || '').trim();
+  if(!trimmed) return '<div class="preview-body empty">(empty)</div>';
+  var out = '';
+  if(parsed.hasHeadings){
+    if(eventRelated && parsed.contributing){
+      out += '<div class="preview-subheading">Contributing to Damage</div>';
+      out += '<div class="preview-body">'+esc(parsed.contributing)+'</div>';
+    }
+    var generalContent = parsed.general;
+    if(!eventRelated && !generalContent && parsed.contributing) generalContent = parsed.contributing;
+    if(generalContent){
+      out += '<div class="preview-subheading">General Observations</div>';
+      out += '<div class="preview-body">'+esc(generalContent)+'</div>';
+    }
+    if(!out){
+      out += '<div class="preview-subheading">General Observations</div>';
+      out += '<div class="preview-body">'+esc(trimmed)+'</div>';
+    }
+  } else {
+    out += '<div class="preview-subheading">General Observations</div>';
+    out += '<div class="preview-body">'+esc(trimmed)+'</div>';
+  }
+  return out;
 }
 
 function renderFindingsTable(text){
@@ -2751,6 +2949,8 @@ function renderPreviewSection(sec){
     html += renderFindingsTable(value);
   } else if(sec.type === 'recs'){
     html += renderRecsTable(value);
+  } else if(sec.type === 'maintenance'){
+    html += renderMaintenanceBody(value);
   } else {
     var body = value.trim() ? esc(value) : '(empty)';
     html += '<div class="preview-body'+(value.trim()?'':' empty')+'">'+body+'</div>';
@@ -3182,6 +3382,8 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   var localPhotos = (photos||[]).slice();
   var f = getJobData();
   var isLeak = f.type==='leak';
+  var isEvent = !isLeak && !!f.eventRelated;
+  var eventDamage = f.aiEventDamage || '';
   var brand = getBrand();
   var brandColour = brand.colour;
   var shText = brandTextOn(brandColour);
@@ -3299,10 +3501,9 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   }
 
   var entryH = (isLeak&&entry&&entry!=='N/A')?'<div class="secwrap"><div class="sh">POINT OF WATER ENTRY</div><div class="bx">'+esc(entry)+'</div></div>':'';
-  var maintHtml = '';
-  if(maint){
-    var maintLines = maint.split('\n');
-    maintHtml = maintLines.map(function(ml){
+
+  function renderMaintLinesPDF(txt){
+    return (txt||'').split('\n').map(function(ml){
       var t = ml.toLowerCase();
       var col = '#222';
       if(/immediate|urgent|safety|danger/.test(t)) col='#cc0000';
@@ -3311,7 +3512,36 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
       return ml.trim()?'<span style="color:'+col+';display:block">'+esc(ml)+'</span>':ml;
     }).join('');
   }
-  var maintH = maint?'<div class="secwrap"><div class="sh">MAINTENANCE</div><div class="bx" style="white-space:normal">'+maintHtml+'</div></div>':'';
+
+  var maintH = '';
+  if(maint){
+    var innerMaint = '';
+    if(isEvent){
+      var parsedM = (typeof parseMaintenanceSubHeadings === 'function') ? parseMaintenanceSubHeadings(maint) : { contributing:'', general:'', hasHeadings:false, all:maint };
+      if(parsedM.hasHeadings){
+        if(parsedM.contributing){
+          innerMaint += '<div class="subsh">Contributing to Damage</div>';
+          innerMaint += renderMaintLinesPDF(parsedM.contributing);
+        }
+        if(parsedM.general){
+          innerMaint += '<div class="subsh"'+(parsedM.contributing?' style="margin-top:10px"':'')+'>General Observations</div>';
+          innerMaint += renderMaintLinesPDF(parsedM.general);
+        }
+        if(!innerMaint){
+          innerMaint += '<div class="subsh">General Observations</div>' + renderMaintLinesPDF(maint);
+        }
+      } else {
+        innerMaint += '<div class="subsh">General Observations</div>' + renderMaintLinesPDF(maint);
+      }
+    } else {
+      innerMaint = renderMaintLinesPDF(maint);
+    }
+    maintH = '<div class="secwrap"><div class="sh">MAINTENANCE</div><div class="bx" style="white-space:normal">'+innerMaint+'</div></div>';
+  }
+
+  var eventH = (isEvent && eventDamage) ? '<div class="secwrap"><div class="sh">Event Damage</div><div class="bx">'+esc(eventDamage)+'</div></div>' : '';
+  var causationH = (isLeak && causation) ? '<div class="secwrap"><div class="sh">Causation</div><div class="bx">'+esc(causation||'')+'</div></div>' : '';
+
   var photoH = pdfPhotos.length?'<div class="sh ph-head">SITE PHOTOGRAPHS</div><div style="margin-top:6px">'+photoRows+'</div>':'';
 
   var coverInfo = '';
@@ -3352,6 +3582,7 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
 '.phdr-ref{font-size:8px;color:#aaa}' +
 '.secwrap{margin-bottom:4px;page-break-inside:avoid}' +
 '.sh{background:'+brandColour+';color:'+shText+';font-size:10px;font-weight:700;letter-spacing:1px;padding:5px 10px;margin:10px 0 0;page-break-after:avoid}' +
+'.subsh{font-size:10px;font-weight:700;color:#222;letter-spacing:0.5px;text-transform:uppercase;margin:2px 0 6px;padding:0}' +
 '.bx{background:#f9f9f9;border:1px solid #ddd;border-top:none;padding:8px 10px;font-size:11px;line-height:1.7;color:#333;white-space:pre-wrap;page-break-before:avoid}' +
 'table{width:100%;border-collapse:collapse}' +
 'td{padding:6px 10px;border:1px solid #ddd;font-size:11px;color:#222;vertical-align:top}' +
@@ -3411,10 +3642,11 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
 
   entryH +
 
+  eventH +
+
   maintH +
 
-  '<div class="secwrap"><div class="sh">Causation</div>' +
-  '<div class="bx">'+esc(causation||'')+'</div></div>' +
+  causationH +
 
   '<div class="secwrap"><div class="sh">Recommendations</div>' +
   '<table><thead><tr>' +
