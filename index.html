@@ -1042,12 +1042,20 @@ function collectBrandingFromLocal(){
   return out;
 }
 
+function isBrandingObjectPopulated(b){
+  if(!b || typeof b !== 'object') return false;
+  return BRANDING_KEYS.some(function(k){
+    return b[k] !== undefined && b[k] !== null && String(b[k]).trim() !== '';
+  });
+}
+
 function writeBrandingToLocal(b){
   if(!b || typeof b !== 'object') return;
   BRANDING_KEYS.forEach(function(k){
-    if(b[k] !== undefined && b[k] !== null){
-      localStorage.setItem('tr_brand_'+k, String(b[k]));
-    }
+    var v = b[k];
+    if(v === undefined || v === null) return;
+    if(String(v).trim() === '') return;
+    localStorage.setItem('tr_brand_'+k, String(v));
   });
 }
 
@@ -1057,18 +1065,45 @@ async function saveBrandingCloud(){
     var sess = await supa.auth.getSession();
     var user = sess && sess.data && sess.data.session && sess.data.session.user;
     if(!user) return;
-    var row = {
+    var localBranding = collectBrandingFromLocal();
+    var localWebhook = (localStorage.getItem('tr_webhook_url') || '').trim();
+
+    var cur = await supa.from('user_settings')
+      .select('branding, webhook_url')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if(cur && cur.error){
+      console.log('Branding cloud pre-fetch failed:', cur.error.message);
+    }
+    var existingBranding = (cur && cur.data && cur.data.branding && typeof cur.data.branding === 'object') ? cur.data.branding : {};
+    var existingWebhook = (cur && cur.data && cur.data.webhook_url) || '';
+
+    var merged = {};
+    BRANDING_KEYS.forEach(function(k){
+      var lv = localBranding[k];
+      if(lv !== undefined && lv !== null && String(lv).trim() !== ''){
+        merged[k] = lv;
+        return;
+      }
+      var ev = existingBranding[k];
+      if(ev !== undefined && ev !== null && String(ev).trim() !== ''){
+        merged[k] = ev;
+      }
+    });
+
+    var mergedWebhook = localWebhook || (existingWebhook || '');
+
+    var res = await supa.from('user_settings').upsert({
       user_id: user.id,
-      branding: collectBrandingFromLocal(),
-      webhook_url: (localStorage.getItem('tr_webhook_url') || '').trim() || null,
+      branding: merged,
+      webhook_url: mergedWebhook || null,
       updated_at: new Date().toISOString()
-    };
-    var res = await supa.from('user_settings').upsert(row, { onConflict: 'user_id' });
+    }, { onConflict: 'user_id' });
     if(res && res.error){
       console.log('Branding cloud save failed:', res.error.message);
-    } else {
-      try { localStorage.setItem('tr_branding_migrated', 'true'); } catch(e){}
+      return;
     }
+    try { localStorage.setItem('tr_branding_migrated', 'true'); } catch(e){}
   } catch(e){
     console.log('Branding cloud save error:', e && e.message);
   }
@@ -1087,14 +1122,22 @@ async function loadBrandingFromCloud(){
     }
     var data = res && res.data;
     if(data){
-      if(data.branding && typeof data.branding === 'object') writeBrandingToLocal(data.branding);
-      if(data.webhook_url != null) localStorage.setItem('tr_webhook_url', data.webhook_url);
+      var cloudBranding = (data.branding && typeof data.branding === 'object') ? data.branding : {};
+      var cloudHasContent = isBrandingObjectPopulated(cloudBranding);
+      if(cloudHasContent){
+        writeBrandingToLocal(cloudBranding);
+      } else if(isBrandingObjectPopulated(collectBrandingFromLocal())){
+        saveBrandingCloud();
+      }
+      if(data.webhook_url != null && String(data.webhook_url).trim() !== ''){
+        localStorage.setItem('tr_webhook_url', data.webhook_url);
+      }
       try { localStorage.setItem('tr_branding_migrated', 'true'); } catch(e){}
       loadBrandingFields();
     } else {
       var b = collectBrandingFromLocal();
       var webhook = (localStorage.getItem('tr_webhook_url') || '').trim();
-      var hasLocal = webhook || Object.keys(b).some(function(k){ return b[k]; });
+      var hasLocal = webhook || isBrandingObjectPopulated(b);
       if(hasLocal){
         await saveBrandingCloud();
       } else {
