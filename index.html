@@ -2744,11 +2744,23 @@ function onLoggedIn(){
   });
 }
 
+function slimPhotoMeta(p){
+  return {
+    id: p && p.id ? p.id : '',
+    cap: p && p.cap ? p.cap : '',
+    orientation: p && p.orientation ? p.orientation : '',
+    width: p && p.width ? p.width : 0,
+    height: p && p.height ? p.height : 0,
+    cloudPath: p && p.cloudPath ? p.cloudPath : ''
+  };
+}
+
 function jobToSupaRow(j){
   var data = {};
   for(var k in j){
     if(j.hasOwnProperty(k) && k!=='id' && k!=='photos') data[k] = j[k];
   }
+  data.photos = (j.photos||[]).map(slimPhotoMeta);
   data.photoCount = (j.photos||[]).length;
   return {
     id: j.id,
@@ -2842,6 +2854,7 @@ function saveJobsStore(syncId){
     var textOnly = jobs.map(function(j){
       var c = {};
       for(var k in j){ if(j.hasOwnProperty(k) && k!=='photos') c[k] = j[k]; }
+      c.photos = (j.photos||[]).map(slimPhotoMeta);
       c.photoCount = (j.photos||[]).length;
       return c;
     });
@@ -3324,6 +3337,8 @@ function openJob(id){
     }
     j.photos = photos;
     photosLoaded = true;
+    hydratePhotosFromCloud();
+    backfillPhotoUploads();
   });
 }
 
@@ -3778,6 +3793,8 @@ function renderPhotos(){
       imgHtml = '<img src="'+p.url+'" alt="Photo '+(i+1)+'">';
     } else if(p.loading){
       imgHtml = '<div style="height:85px;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:11px;background:#f5f5f5">Loading...</div>';
+    } else if(p.error && p.cloudPath){
+      imgHtml = '<div style="height:85px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#D97706;font-size:11px;background:#FFFBEB"><span>Failed</span><button onclick="event.stopPropagation();retryLoadPhoto('+i+')" style="background:transparent;border:1px solid #D97706;color:#D97706;font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Retry</button></div>';
     } else {
       imgHtml = '<div style="height:85px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:11px;background:#f5f5f5">No image</div>';
     }
@@ -4198,6 +4215,116 @@ async function drainPhotoSyncQueue(){
 
 window.addEventListener('online', function(){ drainPhotoSyncQueue(); });
 
+function blobToDataURL(blob){
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onload = function(){ resolve(reader.result); };
+    reader.onerror = function(){ reject(new Error('FileReader failed')); };
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function loadPhotoFromCloud(cloudPath){
+  if(!supa || !cloudPath) return null;
+  try {
+    var res = await supa.storage.from('job-photos').download(cloudPath);
+    if(res && res.error){
+      console.log('Photo download failed:', res.error.message);
+      return null;
+    }
+    if(!res || !res.data) return null;
+    return await blobToDataURL(res.data);
+  } catch(e){
+    console.log('Photo download error:', e && e.message);
+    return null;
+  }
+}
+
+function persistOpenJobPhotosToIDB(){
+  if(!cid || !Array.isArray(photos)) return;
+  var arr = photos.map(function(p){
+    return { id:p.id||'', url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0, cloudPath:p.cloudPath||'' };
+  });
+  idbPut(cid, arr);
+}
+
+async function hydratePhotosFromCloud(){
+  if(!supa || !cid || !Array.isArray(photos) || !photos.length) return;
+  var targets = [];
+  var openCid = cid;
+  photos.forEach(function(p, i){
+    if(p && !p.url && p.cloudPath){
+      p.loading = true;
+      p.error = false;
+      targets.push({ index: i, path: p.cloudPath });
+    }
+  });
+  if(!targets.length) return;
+  renderPhotos();
+  await Promise.all(targets.map(async function(t){
+    var dataUrl = await loadPhotoFromCloud(t.path);
+    if(cid !== openCid) return;
+    var p = photos[t.index];
+    if(!p || p.cloudPath !== t.path) return;
+    if(dataUrl){
+      p.url = dataUrl;
+      p.loading = false;
+      p.error = false;
+    } else {
+      p.loading = false;
+      p.error = true;
+    }
+    renderPhotos();
+  }));
+  if(cid === openCid){
+    persistOpenJobPhotosToIDB();
+  }
+}
+
+async function retryLoadPhoto(i){
+  if(!Array.isArray(photos)) return;
+  var p = photos[i];
+  if(!p || !p.cloudPath) return;
+  p.loading = true;
+  p.error = false;
+  renderPhotos();
+  var openCid = cid;
+  var dataUrl = await loadPhotoFromCloud(p.cloudPath);
+  if(cid !== openCid) return;
+  if(dataUrl){
+    p.url = dataUrl;
+    p.loading = false;
+    p.error = false;
+  } else {
+    p.loading = false;
+    p.error = true;
+  }
+  renderPhotos();
+  persistOpenJobPhotosToIDB();
+}
+
+function backfillPhotoUploads(){
+  if(!supa || !cid || !Array.isArray(photos) || !photos.length) return;
+  photos.forEach(function(p){
+    if(!p || !p.url) return;
+    if(p.cloudPath) return;
+    if(!p.id) p.id = newPhotoId();
+    uploadAndPersistPhoto(cid, p.id, p.url);
+  });
+}
+
+async function ensureCloudPhotosLoaded(arr){
+  if(!Array.isArray(arr) || !arr.length) return arr;
+  await Promise.all(arr.map(async function(p){
+    if(!p) return;
+    if(p.url) return;
+    if(!p.cloudPath) return;
+    var dataUrl = await loadPhotoFromCloud(p.cloudPath);
+    if(dataUrl) p.url = dataUrl;
+  }));
+  return arr;
+}
+
 function compressPhotoForExport(dataUrl){
   return new Promise(function(resolve, reject){
     if(!dataUrl){ reject(new Error('no data url')); return; }
@@ -4234,12 +4361,22 @@ function blobToBase64(blob){
 
 async function getPhotosForJob(jobId){
   if(cid === jobId && photos && photos.length){
+    await ensureCloudPhotosLoaded(photos);
     return photos;
   }
   var arr = await idbGet(jobId);
-  if(arr && arr.length) return arr;
+  if(arr && arr.length){
+    await ensureCloudPhotosLoaded(arr);
+    return arr;
+  }
   var j = jobs.find(function(x){ return x.id === jobId; });
-  return (j && j.photos) || [];
+  var src = (j && j.photos) || [];
+  if(src.length){
+    var copy = src.map(function(p){ return Object.assign({}, p); });
+    await ensureCloudPhotosLoaded(copy);
+    return copy;
+  }
+  return [];
 }
 
 // Core: compress photos, attach cached PDF if it matches the job, POST to /api/drive-upload.
@@ -4535,7 +4672,8 @@ function compressPhotoForPDF(photoUrl){
   });
 }
 
-function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
+async function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
+  if(Array.isArray(photos) && photos.length) await ensureCloudPhotosLoaded(photos);
   var rawPdfPhotos = (photos||[]).filter(function(p){ return p && p.url; });
   console.log('[pdf] compressing', rawPdfPhotos.length, 'photos for PDF...');
   var t0 = Date.now();
