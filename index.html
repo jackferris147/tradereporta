@@ -1031,24 +1031,122 @@ function getBrand(){
   };
 }
 
+var BRANDING_KEYS = ['company','address','abn','licence','phone','email','logo','colour','style'];
+
+function collectBrandingFromLocal(){
+  var out = {};
+  BRANDING_KEYS.forEach(function(k){
+    var v = localStorage.getItem('tr_brand_'+k);
+    if(v !== null) out[k] = v;
+  });
+  return out;
+}
+
+function writeBrandingToLocal(b){
+  if(!b || typeof b !== 'object') return;
+  BRANDING_KEYS.forEach(function(k){
+    if(b[k] !== undefined && b[k] !== null){
+      localStorage.setItem('tr_brand_'+k, String(b[k]));
+    }
+  });
+}
+
+async function saveBrandingCloud(){
+  if(!supa) return;
+  try {
+    var sess = await supa.auth.getSession();
+    var user = sess && sess.data && sess.data.session && sess.data.session.user;
+    if(!user) return;
+    var row = {
+      user_id: user.id,
+      branding: collectBrandingFromLocal(),
+      webhook_url: (localStorage.getItem('tr_webhook_url') || '').trim() || null,
+      updated_at: new Date().toISOString()
+    };
+    var res = await supa.from('user_settings').upsert(row, { onConflict: 'user_id' });
+    if(res && res.error){
+      console.log('Branding cloud save failed:', res.error.message);
+    } else {
+      try { localStorage.setItem('tr_branding_migrated', 'true'); } catch(e){}
+    }
+  } catch(e){
+    console.log('Branding cloud save error:', e && e.message);
+  }
+}
+
+async function loadBrandingFromCloud(){
+  if(!supa) return;
+  try {
+    var sess = await supa.auth.getSession();
+    var user = sess && sess.data && sess.data.session && sess.data.session.user;
+    if(!user) return;
+    var res = await supa.from('user_settings').select('branding, webhook_url').eq('user_id', user.id).maybeSingle();
+    if(res && res.error){
+      console.log('Branding cloud load failed:', res.error.message);
+      return;
+    }
+    var data = res && res.data;
+    if(data){
+      if(data.branding && typeof data.branding === 'object') writeBrandingToLocal(data.branding);
+      if(data.webhook_url != null) localStorage.setItem('tr_webhook_url', data.webhook_url);
+      try { localStorage.setItem('tr_branding_migrated', 'true'); } catch(e){}
+      loadBrandingFields();
+    } else {
+      var b = collectBrandingFromLocal();
+      var webhook = (localStorage.getItem('tr_webhook_url') || '').trim();
+      var hasLocal = webhook || Object.keys(b).some(function(k){ return b[k]; });
+      if(hasLocal){
+        await saveBrandingCloud();
+      } else {
+        try { localStorage.setItem('tr_branding_migrated', 'true'); } catch(e){}
+      }
+    }
+  } catch(e){
+    console.log('Branding cloud load error:', e && e.message);
+  }
+}
+
 function saveBranding(){
   ['company','address','abn','licence','phone','email','colour','style'].forEach(function(f){
     var el = document.getElementById('brand-'+f);
     if(el) localStorage.setItem('tr_brand_'+f, el.value.trim());
   });
   showToast('Branding saved');
+  saveBrandingCloud();
+}
+
+function ensureLogoFitsForCloud(dataUrl, done){
+  if(!dataUrl || dataUrl.length <= 500 * 1024){ done(dataUrl); return; }
+  var img = new Image();
+  img.onload = function(){
+    var maxW = 400;
+    var scale = Math.min(1, maxW / img.width);
+    var w = Math.max(1, Math.round(img.width * scale));
+    var h = Math.max(1, Math.round(img.height * scale));
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    try {
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      done(canvas.toDataURL('image/jpeg', 0.85));
+    } catch(e){ done(dataUrl); }
+  };
+  img.onerror = function(){ done(dataUrl); };
+  img.src = dataUrl;
 }
 
 function handleBrandLogo(e){
   console.log('[brand-logo] handleBrandLogo entered');
   var file = e.target.files[0]; if(!file) return; e.target.value='';
   compressBrandLogo(file, function(dataUrl){
-    console.log('[brand-logo] saving to localStorage, mime prefix:', dataUrl.substring(0, 22));
-    localStorage.setItem('tr_brand_logo', dataUrl);
-    var img = document.getElementById('brand-logo-preview');
-    img.src = dataUrl;
-    img.style.display = 'block';
-    showToast('Logo saved');
+    ensureLogoFitsForCloud(dataUrl, function(finalUrl){
+      console.log('[brand-logo] saving to localStorage, mime prefix:', finalUrl.substring(0, 22), 'length:', finalUrl.length);
+      localStorage.setItem('tr_brand_logo', finalUrl);
+      var img = document.getElementById('brand-logo-preview');
+      img.src = finalUrl;
+      img.style.display = 'block';
+      showToast('Logo saved');
+      saveBrandingCloud();
+    });
   });
 }
 
@@ -1058,6 +1156,7 @@ function resetBrandColour(){
   localStorage.setItem('tr_brand_colour', '#C8D400');
   checkColourWarning();
   showToast('Accent colour reset');
+  saveBrandingCloud();
 }
 
 function rgbToHue(r, g, b){
@@ -1125,6 +1224,7 @@ function pickColourFromLogo(){
     localStorage.setItem('tr_brand_colour', hex);
     checkColourWarning();
     showToast('Accent set to ' + hex);
+    saveBrandingCloud();
   };
   img.onerror = function(){ showToast('Could not load logo'); };
   img.src = src;
@@ -1179,6 +1279,7 @@ function saveWebhookUrl(){
   if(el) el.value = val;
   showToast(val ? 'Webhook saved' : 'Webhook cleared');
   updateFinaliseBtn();
+  saveBrandingCloud();
 }
 
 // Public — safe in client code. Only the Client Secret stays server-side (Worker).
@@ -1589,6 +1690,7 @@ function removeStructure(){
   renderGuidedStep();
   updateGuidedVerifySummary();
   markEdited();
+  autoSaveJob();
 }
 
 function setCurrentStructure(){
@@ -1600,6 +1702,7 @@ function setCurrentStructure(){
   if(rmBtn) rmBtn.style.display = (structures.length > 1 && currentStructure !== 'Main Roof') ? 'inline-block' : 'none';
   renderGuidedStep();
   markEdited();
+  autoSaveJob();
 }
 
 function addStructure(){
@@ -1615,6 +1718,7 @@ function addStructure(){
     renderGuidedStep();
   }
   markEdited();
+  autoSaveJob();
 }
 
 function updateGuidedVisibility(){
@@ -1734,6 +1838,7 @@ function saveGuidedExtra(){
   guidedData[currentStructure][item.key].extra = ta.value;
   markEdited();
   updateGuidedProgress();
+  scheduleGuidedExtraSave();
 }
 
 var guidedRecorder = null;
@@ -1827,6 +1932,7 @@ async function transcribeGuidedItem(){
     markEdited();
     autoTickChecklist(itemKey);
     updateGuidedVerifySummary();
+    autoSaveJob();
     var items = getActiveGuidedSet();
     var curItem = items[currentStepIndex];
     if(structure === currentStructure && curItem && curItem.key === itemKey){
@@ -1856,6 +1962,7 @@ function skipGuidedItem(){
   showToast('Skipped ' + item.label);
   markEdited();
   updateGuidedVerifySummary();
+  autoSaveJob();
   nextGuidedStep();
 }
 
@@ -2580,6 +2687,7 @@ function onLoggedIn(){
       try { return localStorage.getItem('tr_migrated') === 'true'; } catch(e){ return false; }
     })();
     var migration = doneMigration ? Promise.resolve() : migrateLocalToCloud();
+    loadBrandingFromCloud();
     migration.then(loadJobsFromSupa).then(function(){
       goView('jobs');
       var openId = sessionStorage.getItem('tr_open_id');
@@ -2718,6 +2826,37 @@ function saveDraftBtn(){
     showToast('Draft saved');
   } catch(e){ showToast('Save failed'); }
 }
+
+function autoSaveJob(){
+  if(!cid) return;
+  try {
+    var d = getJobData();
+    var i = jobs.findIndex(function(j){ return j.id === cid; });
+    if(i >= 0) jobs[i] = d; else jobs.push(d);
+    saveJobsStore();
+  } catch(e){ console.log('Auto-save failed:', e && e.message); }
+}
+
+var guidedExtraSaveTimer = null;
+function scheduleGuidedExtraSave(){
+  if(guidedExtraSaveTimer) clearTimeout(guidedExtraSaveTimer);
+  guidedExtraSaveTimer = setTimeout(function(){
+    guidedExtraSaveTimer = null;
+    autoSaveJob();
+  }, 1000);
+}
+
+window.addEventListener('beforeunload', function(){
+  if(cid && typeof getJobData === 'function'){
+    try { autoSaveJob(); } catch(e){}
+  }
+});
+
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'hidden' && cid){
+    autoSaveJob();
+  }
+});
 
 function getJobData(){
   var existing = jobs.find(function(x){ return x.id === cid; });
