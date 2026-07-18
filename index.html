@@ -2731,6 +2731,7 @@ function onLoggedIn(){
     })();
     var migration = doneMigration ? Promise.resolve() : migrateLocalToCloud();
     loadBrandingFromCloud();
+    drainPhotoSyncQueue();
     migration.then(loadJobsFromSupa).then(function(){
       goView('jobs');
       var openId = sessionStorage.getItem('tr_open_id');
@@ -2851,7 +2852,7 @@ function saveJobsStore(syncId){
     if(photosLoaded){
       var idx = jobs.findIndex(function(j){ return j.id===cid; });
       if(idx>=0){
-        var arr = (jobs[idx].photos||[]).map(function(p){ return {url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0}; });
+        var arr = (jobs[idx].photos||[]).map(function(p){ return {id:p.id||'', url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0, cloudPath:p.cloudPath||''}; });
         idbPut(cid, arr);
       }
     }
@@ -3316,10 +3317,10 @@ function openJob(id){
   idbGet(id).then(function(arr){
     if(cid !== openCid) return;
     var src = (arr && arr.length) ? arr : (j.photos||[]);
-    photos = src.map(function(p){ return {url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0, loading:false}; });
+    photos = src.map(function(p){ return {id:p.id||'', url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0, cloudPath:p.cloudPath||'', loading:false}; });
     renderPhotos();
     if((!arr || !arr.length) && j.photos && j.photos.length){
-      idbPut(id, photos.map(function(p){ return {url:p.url||'', cap:p.cap||''}; }));
+      idbPut(id, photos.map(function(p){ return {id:p.id||'', url:p.url||'', cap:p.cap||'', cloudPath:p.cloudPath||''}; }));
     }
     j.photos = photos;
     photosLoaded = true;
@@ -3748,12 +3749,19 @@ function readPhotosOrdered(files){
   renderPhotos();
   files.forEach(function(file, i){
     compressImage(file).then(function(res){
-      photos[startIdx+i].url = res.url;
-      photos[startIdx+i].width = res.width;
-      photos[startIdx+i].height = res.height;
-      photos[startIdx+i].orientation = res.width > res.height ? 'landscape' : 'portrait';
-      photos[startIdx+i].loading = false;
+      var slot = photos[startIdx+i];
+      if(!slot) return;
+      if(!slot.id) slot.id = newPhotoId();
+      slot.url = res.url;
+      slot.width = res.width;
+      slot.height = res.height;
+      slot.orientation = res.width > res.height ? 'landscape' : 'portrait';
+      slot.loading = false;
       renderPhotos();
+      var jobId = cid;
+      if(jobId){
+        uploadAndPersistPhoto(jobId, slot.id, res.url);
+      }
     }).catch(function(){
       photos[startIdx+i].loading = false;
       renderPhotos();
@@ -4045,6 +4053,151 @@ function sanitizeFileSegment(s){
 }
 
 // Returns raw base64 (no data: prefix) of a resized JPEG, max 1920px on the long side.
+function newPhotoId(){
+  return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+}
+
+function compressPhotoForCloud(dataUrl){
+  return new Promise(function(resolve, reject){
+    if(!dataUrl){ reject(new Error('no data url')); return; }
+    var img = new Image();
+    img.onload = function(){
+      var maxSide = 1920;
+      var w = img.width, h = img.height;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      try {
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function(blob){
+          if(!blob){ reject(new Error('toBlob failed')); return; }
+          resolve(blob);
+        }, 'image/jpeg', 0.8);
+      } catch(e){ reject(e); }
+    };
+    img.onerror = function(){ reject(new Error('image decode failed')); };
+    img.src = dataUrl;
+  });
+}
+
+async function uploadPhotoToCloud(jobId, photoId, blob){
+  if(!supa) return null;
+  try {
+    var sess = await supa.auth.getSession();
+    var userId = sess && sess.data && sess.data.session && sess.data.session.user && sess.data.session.user.id;
+    if(!userId) return null;
+    var path = userId + '/' + jobId + '/' + photoId + '.jpg';
+    var res = await supa.storage.from('job-photos').upload(path, blob, {
+      upsert: true,
+      contentType: 'image/jpeg'
+    });
+    if(res && res.error){
+      console.log('Photo upload failed:', res.error.message);
+      return null;
+    }
+    return path;
+  } catch(e){
+    console.log('Photo upload error:', e && e.message);
+    return null;
+  }
+}
+
+var PHOTO_SYNC_QUEUE_KEY = 'photo_sync_queue';
+
+function readPhotoSyncQueue(){
+  try {
+    var raw = localStorage.getItem(PHOTO_SYNC_QUEUE_KEY);
+    if(!raw) return [];
+    var q = JSON.parse(raw);
+    return Array.isArray(q) ? q : [];
+  } catch(e){ return []; }
+}
+
+function writePhotoSyncQueue(q){
+  try { localStorage.setItem(PHOTO_SYNC_QUEUE_KEY, JSON.stringify(q)); } catch(e){}
+}
+
+function enqueuePhotoSync(jobId, photoId){
+  if(!jobId || !photoId) return;
+  var q = readPhotoSyncQueue();
+  if(!q.some(function(e){ return e.jobId === jobId && e.photoId === photoId; })){
+    q.push({ jobId: jobId, photoId: photoId });
+    writePhotoSyncQueue(q);
+  }
+}
+
+function dequeuePhotoSync(jobId, photoId){
+  var q = readPhotoSyncQueue().filter(function(e){
+    return !(e.jobId === jobId && e.photoId === photoId);
+  });
+  writePhotoSyncQueue(q);
+}
+
+async function uploadAndPersistPhoto(jobId, photoId, dataUrl){
+  if(!jobId || !photoId || !dataUrl) return null;
+  try {
+    var blob = await compressPhotoForCloud(dataUrl);
+    var path = await uploadPhotoToCloud(jobId, photoId, blob);
+    if(!path){
+      enqueuePhotoSync(jobId, photoId);
+      return null;
+    }
+    if(cid === jobId && Array.isArray(photos)){
+      var idxMem = photos.findIndex(function(p){ return p.id === photoId; });
+      if(idxMem >= 0) photos[idxMem].cloudPath = path;
+    }
+    var jIdx = jobs.findIndex(function(j){ return j.id === jobId; });
+    if(jIdx >= 0){
+      var pArr = jobs[jIdx].photos || [];
+      var pIdx = pArr.findIndex(function(p){ return p && p.id === photoId; });
+      if(pIdx >= 0) pArr[pIdx].cloudPath = path;
+    }
+    dequeuePhotoSync(jobId, photoId);
+    if(cid === jobId && typeof autoSaveJob === 'function') autoSaveJob();
+    return path;
+  } catch(e){
+    console.log('uploadAndPersistPhoto error:', e && e.message);
+    enqueuePhotoSync(jobId, photoId);
+    return null;
+  }
+}
+
+async function drainPhotoSyncQueue(){
+  if(!supa) return;
+  var q = readPhotoSyncQueue();
+  if(!q.length) return;
+  try {
+    var sess = await supa.auth.getSession();
+    if(!(sess && sess.data && sess.data.session && sess.data.session.user)) return;
+  } catch(e){ return; }
+  for(var i = 0; i < q.length; i++){
+    var entry = q[i];
+    var jobId = entry.jobId;
+    var photoId = entry.photoId;
+    var dataUrl = null;
+    if(cid === jobId && Array.isArray(photos)){
+      var p = photos.find(function(x){ return x.id === photoId; });
+      if(p && p.url) dataUrl = p.url;
+    }
+    if(!dataUrl){
+      var arr = await idbGet(jobId);
+      if(Array.isArray(arr)){
+        var hit = arr.find(function(x){ return x && x.id === photoId; });
+        if(hit && hit.url) dataUrl = hit.url;
+      }
+    }
+    if(!dataUrl){
+      dequeuePhotoSync(jobId, photoId);
+      continue;
+    }
+    await uploadAndPersistPhoto(jobId, photoId, dataUrl);
+  }
+}
+
+window.addEventListener('online', function(){ drainPhotoSyncQueue(); });
+
 function compressPhotoForExport(dataUrl){
   return new Promise(function(resolve, reject){
     if(!dataUrl){ reject(new Error('no data url')); return; }
