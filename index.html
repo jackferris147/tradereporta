@@ -943,6 +943,88 @@ function idbGet(id){
     } catch(e){ resolve([]); }
   });
 }
+function idbGetAllKeys(){
+  return new Promise(function(resolve){
+    if(!idb){ resolve([]); return; }
+    try {
+      var tx = idb.transaction('photos','readonly');
+      var req = tx.objectStore('photos').getAllKeys();
+      req.onsuccess = function(){ resolve(req.result || []); };
+      req.onerror = function(){ resolve([]); };
+    } catch(e){ resolve([]); }
+  });
+}
+
+async function diagPhotoStorage(jobId){
+  console.log('[diag] --- photo storage report for jobId=' + jobId + ' ---');
+  try {
+    var allKeys = await idbGetAllKeys();
+    console.log('[diag] IDB "photos" store keys (' + allKeys.length + '):', allKeys);
+    console.log('[diag] jobId present in IDB keys?', allKeys.indexOf(jobId) !== -1);
+    if(allKeys.length && allKeys.indexOf(jobId) === -1){
+      var jobIdStr = String(jobId);
+      var looseMatch = allKeys.filter(function(k){ return String(k) === jobIdStr; });
+      if(looseMatch.length) console.log('[diag] NOTE: type-mismatched key match:', looseMatch, '(job id type=' + typeof jobId + ')');
+    }
+  } catch(e){
+    console.log('[diag] IDB keys error:', e && e.message);
+  }
+  try {
+    var arr = await idbGet(jobId);
+    var count = Array.isArray(arr) ? arr.length : 0;
+    console.log('[diag] IDB.get(' + jobId + ') → type=' + (Array.isArray(arr) ? 'array' : typeof arr) + ' length=' + count);
+    if(count > 0){
+      var withUrl = arr.filter(function(p){ return p && typeof p.url === 'string' && p.url.length > 0; }).length;
+      var withCloud = arr.filter(function(p){ return p && p.cloudPath; }).length;
+      var withId = arr.filter(function(p){ return p && p.id; }).length;
+      console.log('[diag] IDB photos: withUrl=' + withUrl + ' withCloudPath=' + withCloud + ' withId=' + withId);
+      console.log('[diag] IDB first entry keys:', Object.keys(arr[0] || {}));
+      var first = arr[0] || {};
+      console.log('[diag] IDB first entry summary:', {
+        id: first.id || '(none)',
+        cap: first.cap || '',
+        orientation: first.orientation || '',
+        width: first.width || 0,
+        height: first.height || 0,
+        cloudPath: first.cloudPath || '(none)',
+        urlType: typeof first.url,
+        urlLength: (first.url || '').length,
+        urlPrefix: (first.url || '').slice(0, 30)
+      });
+    }
+  } catch(e){
+    console.log('[diag] IDB.get error:', e && e.message);
+  }
+  try {
+    var j = jobs.find(function(x){ return x.id === jobId; });
+    if(!j){
+      console.log('[diag] jobs[] has no entry for jobId=' + jobId);
+    } else {
+      var jp = Array.isArray(j.photos) ? j.photos : [];
+      var jpWithCloud = jp.filter(function(p){ return p && p.cloudPath; }).length;
+      console.log('[diag] jobs[] photos length=' + jp.length + ' withCloudPath=' + jpWithCloud + ' photoCount(field)=' + j.photoCount);
+      console.log('[diag] jobs[] photos raw:', jp);
+    }
+  } catch(e){
+    console.log('[diag] jobs[] read error:', e && e.message);
+  }
+  try {
+    var raw = localStorage.getItem('tr_jobs');
+    var ls = raw ? JSON.parse(raw) : null;
+    var lsJob = Array.isArray(ls) ? ls.find(function(x){ return x.id === jobId; }) : null;
+    if(!lsJob){
+      console.log('[diag] localStorage tr_jobs has no entry for jobId=' + jobId);
+    } else {
+      var lp = Array.isArray(lsJob.photos) ? lsJob.photos : null;
+      console.log('[diag] localStorage tr_jobs photos length=' + (lp ? lp.length : '(field missing)') + ' photoCount(field)=' + lsJob.photoCount);
+      if(lp) console.log('[diag] localStorage photos raw:', lp);
+    }
+  } catch(e){
+    console.log('[diag] localStorage read error:', e && e.message);
+  }
+  console.log('[diag] --- end report ---');
+}
+
 function idbDelete(id){
   return new Promise(function(resolve){
     if(!idb||!id){ resolve(); return; }
@@ -3294,6 +3376,7 @@ function newJob(){
 function openJob(id){
   var j = jobs.find(function(x){ return x.id===id; }); if(!j) return;
   cid=id; jtype=j.type||'roof';
+  diagPhotoStorage(id);
   clearForm();
   setType(jtype);
   sv('f-client',j.client); sv('f-ref',j.ref); sv('f-cm',j.cm); sv('f-cmemail',j.cmemail);
