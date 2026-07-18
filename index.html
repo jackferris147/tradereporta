@@ -153,6 +153,9 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .jcard-action .jcard-reopen{margin-top:0}
 #finalise-btn.finalise-muted{font-size:11px;padding:9px 12px;white-space:normal;line-height:1.2}
 .binvoiced{background:#F0FDF4;border-color:rgba(22,163,74,0.2);color:#16A34A}
+.bawaiting{background:#FFFBEB;border-color:rgba(217,119,6,0.25);color:#B45309}
+.jbadge-toggle{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:filter 0.12s}
+.jbadge-toggle:hover{filter:brightness(0.94)}
 .worow{display:flex;gap:10px;align-items:flex-start}
 .wotxt{flex:1;background:#F7F5F2;border:1px solid #E2DDD8;border-radius:6px;color:#1C1A18;font-family:'Barlow',sans-serif;font-size:14px;padding:9px 12px;min-height:90px;resize:vertical;line-height:1.5;outline:none;transition:border-color 0.15s,background 0.15s}
 .wotxt:focus{border-color:#E8763A;background:#FFFFFF;box-shadow:0 0 0 3px rgba(232,118,58,0.10)}
@@ -943,139 +946,6 @@ function idbGet(id){
     } catch(e){ resolve([]); }
   });
 }
-function idbGetAllKeys(){
-  return new Promise(function(resolve){
-    if(!idb){ resolve([]); return; }
-    try {
-      var tx = idb.transaction('photos','readonly');
-      var req = tx.objectStore('photos').getAllKeys();
-      req.onsuccess = function(){ resolve(req.result || []); };
-      req.onerror = function(){ resolve([]); };
-    } catch(e){ resolve([]); }
-  });
-}
-
-async function diagPhotoStorage(jobId, opts){
-  opts = opts || {};
-  var lines = [];
-  function line(s){ lines.push(s); console.log('[diag] ' + s); }
-
-  line('--- photo storage report for jobId=' + jobId + ' ---');
-  try {
-    var allKeys = await idbGetAllKeys();
-    line('IDB "photos" store keys count=' + allKeys.length);
-    line('IDB keys sample: ' + JSON.stringify(allKeys.slice(0, 20)) + (allKeys.length > 20 ? ' ...(' + (allKeys.length - 20) + ' more)' : ''));
-    line('jobId present in IDB keys? ' + (allKeys.indexOf(jobId) !== -1));
-    if(allKeys.length && allKeys.indexOf(jobId) === -1){
-      var jobIdStr = String(jobId);
-      var looseMatch = allKeys.filter(function(k){ return String(k) === jobIdStr; });
-      if(looseMatch.length) line('NOTE type-mismatched key match: ' + JSON.stringify(looseMatch) + ' (job id type=' + typeof jobId + ')');
-    }
-  } catch(e){
-    line('IDB keys error: ' + (e && e.message));
-  }
-  try {
-    var arr = await idbGet(jobId);
-    var count = Array.isArray(arr) ? arr.length : 0;
-    line('IDB.get(' + jobId + ') type=' + (Array.isArray(arr) ? 'array' : typeof arr) + ' length=' + count);
-    if(count > 0){
-      var withUrl = arr.filter(function(p){ return p && typeof p.url === 'string' && p.url.length > 0; }).length;
-      var withCloud = arr.filter(function(p){ return p && p.cloudPath; }).length;
-      var withId = arr.filter(function(p){ return p && p.id; }).length;
-      line('IDB photos withUrl=' + withUrl + ' withCloudPath=' + withCloud + ' withId=' + withId);
-      line('IDB first entry keys: ' + JSON.stringify(Object.keys(arr[0] || {})));
-      var first = arr[0] || {};
-      line('IDB first entry:');
-      line('  id=' + (first.id || '(none)'));
-      line('  cap=' + (first.cap || ''));
-      line('  orientation=' + (first.orientation || ''));
-      line('  width=' + (first.width || 0) + ' height=' + (first.height || 0));
-      line('  cloudPath=' + (first.cloudPath || '(none)'));
-      line('  urlType=' + typeof first.url + ' urlLength=' + (first.url || '').length);
-      line('  urlPrefix=' + (first.url || '').slice(0, 30));
-    }
-  } catch(e){
-    line('IDB.get error: ' + (e && e.message));
-  }
-  try {
-    var j = jobs.find(function(x){ return x.id === jobId; });
-    if(!j){
-      line('jobs[] has no entry for jobId');
-    } else {
-      var jp = Array.isArray(j.photos) ? j.photos : [];
-      var jpWithCloud = jp.filter(function(p){ return p && p.cloudPath; }).length;
-      line('jobs[] photos length=' + jp.length + ' withCloudPath=' + jpWithCloud + ' photoCount(field)=' + j.photoCount);
-      if(jp.length){
-        line('jobs[] first entry: ' + JSON.stringify(jp[0]));
-      }
-    }
-  } catch(e){
-    line('jobs[] read error: ' + (e && e.message));
-  }
-  try {
-    var raw = localStorage.getItem('tr_jobs');
-    var ls = raw ? JSON.parse(raw) : null;
-    var lsJob = Array.isArray(ls) ? ls.find(function(x){ return x.id === jobId; }) : null;
-    if(!lsJob){
-      line('localStorage tr_jobs has no entry for jobId');
-    } else {
-      var lp = Array.isArray(lsJob.photos) ? lsJob.photos : null;
-      line('localStorage photos length=' + (lp ? lp.length : '(field missing)') + ' photoCount(field)=' + lsJob.photoCount);
-      if(lp && lp.length){
-        line('localStorage first entry: ' + JSON.stringify(lp[0]));
-      }
-    }
-  } catch(e){
-    line('localStorage read error: ' + (e && e.message));
-  }
-  line('--- end report ---');
-
-  var text = lines.join('\n');
-  if(opts.showModal) showDiagModal(text);
-  return text;
-}
-
-function showDiagModal(text){
-  var existing = document.getElementById('diag-modal');
-  if(existing) existing.parentNode.removeChild(existing);
-  var wrap = document.createElement('div');
-  wrap.id = 'diag-modal';
-  wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(28,26,24,0.65);display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,BlinkMacSystemFont,sans-serif';
-  wrap.innerHTML =
-    '<div style="background:#FFFFFF;border-radius:12px;max-width:640px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
-      '<div style="padding:14px 18px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between">' +
-        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;color:#1C1A18">Photo Storage Diagnostic</div>' +
-        '<button id="diag-close" style="background:none;border:none;font-size:22px;color:#6B7280;cursor:pointer;padding:0 4px;line-height:1">&times;</button>' +
-      '</div>' +
-      '<pre id="diag-body" style="flex:1;overflow:auto;margin:0;padding:14px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:#1C1A18;background:#FAFAFA"></pre>' +
-      '<div style="padding:12px 18px;border-top:1px solid #E5E7EB;display:flex;gap:8px;justify-content:flex-end">' +
-        '<button id="diag-copy" class="sbtn" style="min-height:40px">Copy</button>' +
-        '<button id="diag-dismiss" class="pbtn" style="min-height:40px">Close</button>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(wrap);
-  document.getElementById('diag-body').textContent = text;
-  function close(){ if(wrap.parentNode) wrap.parentNode.removeChild(wrap); }
-  document.getElementById('diag-close').onclick = close;
-  document.getElementById('diag-dismiss').onclick = close;
-  document.getElementById('diag-copy').onclick = function(){
-    var doneToast = function(){ showToast('Diagnostic copied'); };
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).then(doneToast, function(){
-        var body = document.getElementById('diag-body');
-        var r = document.createRange(); r.selectNodeContents(body);
-        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-        showToast('Selected — long-press to copy');
-      });
-    } else {
-      var body = document.getElementById('diag-body');
-      var r = document.createRange(); r.selectNodeContents(body);
-      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-      showToast('Selected — long-press to copy');
-    }
-  };
-}
-
 function idbDelete(id){
   return new Promise(function(resolve){
     if(!idb||!id){ resolve(); return; }
@@ -3225,6 +3095,19 @@ function reopenJob(id){
   openJob(id);
 }
 
+function toggleInvoiced(id){
+  var i = jobs.findIndex(function(x){ return x.id === id; });
+  if(i < 0) return;
+  var currentlyInvoiced = !!jobs[i].invoiced;
+  var msg = currentlyInvoiced ? 'Mark as NOT invoiced?' : 'Mark this job as invoiced?';
+  if(!confirm(msg)) return;
+  jobs[i].invoiced = !currentlyInvoiced;
+  jobs[i].updatedAt = Date.now();
+  saveJobsStore(id);
+  renderJobs();
+  showToast(jobs[i].invoiced ? 'Marked as invoiced' : 'Marked as not invoiced');
+}
+
 function renderJobCard(j, sectionKey){
   var typeLabel = j.type === 'leak' ? 'Leak Investigation' : (j.type === 'makesafe' ? 'Make Safe' : 'Roof Inspection');
   var title = j.address || j.client || 'Untitled report';
@@ -3239,7 +3122,13 @@ function renderJobCard(j, sectionKey){
   if(sub) html += '<div class="jcard-sub">'+sub+'</div>';
   html += '<div class="jcard-meta">';
   html += '<span class="jbadge">'+typeLabel+'</span>';
-  if(j.invoiced) html += '<span class="jbadge binvoiced">&#10003; Invoiced</span>';
+  if(sectionKey === 'completed'){
+    html += '<span class="jbadge binvoiced jbadge-toggle" onclick="event.stopPropagation();toggleInvoiced(\''+j.id+'\')" title="Tap to mark as not invoiced">&#10003; Invoiced</span>';
+  } else if(sectionKey === 'awaiting'){
+    html += '<span class="jbadge bawaiting jbadge-toggle" onclick="event.stopPropagation();toggleInvoiced(\''+j.id+'\')" title="Tap to mark as invoiced">Awaiting Invoice</span>';
+  } else if(j.invoiced){
+    html += '<span class="jbadge binvoiced">&#10003; Invoiced</span>';
+  }
   html += '<span class="jcard-photos" data-jobid="'+j.id+'" title="Photos on this device">' +
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>' +
     '<span class="photo-count">&#8211;</span>' +
@@ -3427,7 +3316,6 @@ function newJob(){
 function openJob(id){
   var j = jobs.find(function(x){ return x.id===id; }); if(!j) return;
   cid=id; jtype=j.type||'roof';
-  diagPhotoStorage(id, { showModal: j.status === 'completed' });
   clearForm();
   setType(jtype);
   sv('f-client',j.client); sv('f-ref',j.ref); sv('f-cm',j.cm); sv('f-cmemail',j.cmemail);
