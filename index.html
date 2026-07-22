@@ -3658,6 +3658,73 @@ async function restoreJobVersion(versionId){
   }
 }
 
+function showReportGenDiagModal(info){
+  var lines = [];
+  lines.push('=== AI REPORT GENERATION DIAGNOSTIC ===');
+  lines.push('stop_reason: ' + info.stopReason);
+  lines.push('usage: input=' + (info.usage.input_tokens || '?') + ' output=' + (info.usage.output_tokens || '?'));
+  lines.push('systemPromptLen: ' + info.systemPromptLen);
+  lines.push('rawResponseLen: ' + info.rawResponse.length);
+  lines.push('');
+  lines.push('EXPECTED TAGS for this report type: ' + info.expectedTags.join(', '));
+  lines.push('MISSING (extracted empty): ' + info.missing.join(', '));
+  lines.push('');
+  lines.push('PER-TAG RESULT:');
+  info.expectedTags.forEach(function(t){
+    var r = info.parsedMap[t];
+    lines.push('  [' + t + '] present=' + r.present + ' extractedLen=' + r.length + (r.preview ? ' preview="' + r.preview + (r.length > 60 ? '…' : '') + '"' : ''));
+  });
+  lines.push('');
+  lines.push('SYSTEM PROMPT (last 400 chars):');
+  lines.push(info.systemPromptTail);
+  lines.push('');
+  lines.push('=== RAW AI RESPONSE ===');
+  lines.push(info.rawResponse);
+  lines.push('=== END ===');
+  var text = lines.join('\n');
+
+  var existing = document.getElementById('reportgen-diag-modal');
+  if(existing) existing.parentNode.removeChild(existing);
+  var wrap = document.createElement('div');
+  wrap.id = 'reportgen-diag-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(28,26,24,0.65);display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,BlinkMacSystemFont,sans-serif';
+  wrap.innerHTML =
+    '<div style="background:#FFFFFF;border-radius:12px;max-width:720px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
+      '<div style="padding:14px 18px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between">' +
+        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;color:#DC2626">Report Generation — Missing Sections</div>' +
+        '<button id="rgdiag-close" style="background:none;border:none;font-size:22px;color:#6B7280;cursor:pointer;padding:0 4px;line-height:1">&times;</button>' +
+      '</div>' +
+      '<pre id="rgdiag-body" style="flex:1;overflow:auto;margin:0;padding:14px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:#1C1A18;background:#FAFAFA"></pre>' +
+      '<div style="padding:12px 18px;border-top:1px solid #E5E7EB;display:flex;gap:8px;justify-content:flex-end">' +
+        '<button id="rgdiag-copy" class="sbtn" style="min-height:40px">Copy</button>' +
+        '<button id="rgdiag-dismiss" class="pbtn" style="min-height:40px">Close</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(wrap);
+  document.getElementById('rgdiag-body').textContent = text;
+  function close(){ if(wrap.parentNode) wrap.parentNode.removeChild(wrap); }
+  document.getElementById('rgdiag-close').onclick = close;
+  document.getElementById('rgdiag-dismiss').onclick = close;
+  document.getElementById('rgdiag-copy').onclick = function(){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(
+        function(){ showToast('Report diagnostic copied'); },
+        function(){
+          var b = document.getElementById('rgdiag-body');
+          var r = document.createRange(); r.selectNodeContents(b);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+          showToast('Selected — long-press to copy');
+        }
+      );
+    } else {
+      var b = document.getElementById('rgdiag-body');
+      var r = document.createRange(); r.selectNodeContents(b);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      showToast('Selected — long-press to copy');
+    }
+  };
+}
+
 function isJobContentEmpty(j){
   if(!j) return false;
   var strFields = ['transcript','notes','aiScope','aiFindings','aiEntry','aiCausation','aiEventDamage','aiIssue','aiWorks','aiLimitations','aiMaint','aiRecs','aiConclusion'];
@@ -4161,6 +4228,9 @@ function runReportGen(transcript, opts){
   .then(function(data){
     if(data.error) throw new Error(data.error.message);
     var text = data.content[0].text;
+    var stopReason = data.stop_reason || '(none)';
+    var usage = data.usage || {};
+    console.log('[report-gen] response length=' + text.length + ' chars, stop_reason=' + stopReason + ', usage input=' + (usage.input_tokens || '?') + ' output=' + (usage.output_tokens || '?'));
     function ex(tag){
       var start = text.indexOf('['+tag+']');
       if(start===-1) return '';
@@ -4168,6 +4238,21 @@ function runReportGen(transcript, opts){
       var next = text.indexOf('[',from);
       return (next===-1?text.substring(from):text.substring(from,next)).trim();
     }
+    var expectedTags = ['SCOPE','FINDINGS'];
+    if(jtype === 'leak') expectedTags.push('ENTRY','CAUSATION','MAINTENANCE');
+    else if(jtype === 'makesafe') expectedTags = ['SCOPE','ISSUE','FINDINGS','WORKS','LIMITATIONS','CONCLUSION'];
+    else if(eventRelated) expectedTags.push('EVENT_DAMAGE','MAINTENANCE');
+    else expectedTags.push('MAINTENANCE');
+    if(jtype !== 'makesafe') expectedTags.push('RECOMMENDATIONS','CONCLUSION');
+    var parsedMap = {};
+    expectedTags.forEach(function(t){
+      var v = ex(t);
+      parsedMap[t] = { present: text.indexOf('['+t+']') !== -1, length: v.length, preview: v.slice(0, 60).replace(/\s+/g,' ') };
+    });
+    console.log('[report-gen] expected tags for jtype=' + jtype + ' event=' + eventRelated + ':', expectedTags);
+    console.log('[report-gen] tag presence + extracted length:', parsedMap);
+    console.log('[report-gen] system prompt has [RECOMMENDATIONS]? ' + (systemPrompt.indexOf('[RECOMMENDATIONS]') !== -1) + ' [CONCLUSION]? ' + (systemPrompt.indexOf('[CONCLUSION]') !== -1));
+    console.log('[report-gen] raw AI response:\n' + text);
     sv('ai-scope',ex('SCOPE')); sv('ai-findings',ex('FINDINGS')); sv('ai-entry',ex('ENTRY'));
     sv('ai-causation',ex('CAUSATION'));
     sv('ai-event-damage', ex('EVENT_DAMAGE'));
@@ -4182,6 +4267,19 @@ function runReportGen(transcript, opts){
     showToast('Report sections generated');
     saveJob();
     if(cid) snapshotJob(cid, { force: true, reason: 'report-gen' });
+    var missing = expectedTags.filter(function(t){ return parsedMap[t].length === 0; });
+    if(missing.length){
+      showReportGenDiagModal({
+        stopReason: stopReason,
+        usage: usage,
+        systemPromptLen: systemPrompt.length,
+        systemPromptTail: systemPrompt.slice(-400),
+        expectedTags: expectedTags,
+        missing: missing,
+        parsedMap: parsedMap,
+        rawResponse: text
+      });
+    }
   })
   .catch(function(e){ setPill('expand-status','Error: '+e.message,'err'); throw e; })
   .finally(function(){ busy=false; document.getElementById('gen-btn').disabled=false; });
