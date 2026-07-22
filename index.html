@@ -128,6 +128,10 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
 .recdot{width:7px;height:7px;border-radius:50%;background:#C0392B;flex-shrink:0}
 .recbtn.recording .recdot{animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+@keyframes pulse-rec{0%,100%{opacity:1}50%{opacity:0.3}}
+@keyframes rec-halo{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0.55)}50%{box-shadow:0 0 0 10px rgba(220,38,38,0)}}
+.rec-indicator{width:10px;height:10px;border-radius:50%;background:#FFFFFF;display:inline-block;vertical-align:middle;margin-right:8px;animation:pulse-rec 1s infinite}
+.pbtn.rec-active{animation:rec-halo 1.4s infinite}
 .vnotes{border-top:1px solid #E2DDD8;padding:14px;display:none}
 .vnotes.on{display:block}
 .dropzone{border:2px dashed #E2DDD8;border-radius:10px;padding:24px 20px;text-align:center;cursor:pointer;position:relative;transition:all 0.15s;background:#FFFFFF}
@@ -1854,6 +1858,7 @@ function renderGuidedStep(){
     lastGuidedCategory = (preInspectData && (preInspectData.roofType === 'tile' || preInspectData.roofType === 'concrete-tile')) ? 'tile' : 'metal';
   }
   updateGuidedProgress();
+  if(guidedRecording) updateGuidedRecordButton();
 }
 
 function nextGuidedStep(){
@@ -1892,6 +1897,44 @@ var guidedChunks = [];
 var guidedRecording = false;
 var guidedRecStructure = null;
 var guidedRecItemKey = null;
+var guidedRecMimeType = '';
+var guidedRecStartTime = 0;
+var guidedRecTimer = null;
+
+function getSupportedMimeType(){
+  if(typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
+  var types = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'];
+  for(var i = 0; i < types.length; i++){
+    try { if(MediaRecorder.isTypeSupported(types[i])) return types[i]; } catch(e){}
+  }
+  return '';
+}
+
+function extForMime(mime){
+  var t = (mime || '').toLowerCase();
+  if(t.indexOf('mp4') >= 0 || t.indexOf('aac') >= 0) return 'm4a';
+  if(t.indexOf('ogg') >= 0) return 'ogg';
+  if(t.indexOf('wav') >= 0) return 'wav';
+  return 'webm';
+}
+
+function formatRecElapsed(ms){
+  var s = Math.floor(ms / 1000);
+  var m = Math.floor(s / 60);
+  var r = s % 60;
+  return m + ':' + (r < 10 ? '0' : '') + r;
+}
+
+function tickGuidedRecTime(){
+  var el = document.getElementById('guided-rec-time');
+  if(!el || !guidedRecStartTime) return;
+  el.textContent = formatRecElapsed(Date.now() - guidedRecStartTime);
+}
+
+function stopGuidedRecTimer(){
+  if(guidedRecTimer){ clearInterval(guidedRecTimer); guidedRecTimer = null; }
+  guidedRecStartTime = 0;
+}
 
 async function recordGuidedItem(){
   if(guidedRecording){
@@ -1906,13 +1949,25 @@ async function recordGuidedItem(){
     guidedChunks = [];
     guidedRecStructure = currentStructure;
     guidedRecItemKey = item.key;
-    guidedRecorder = new MediaRecorder(stream);
+    var mimeType = getSupportedMimeType();
+    console.log('[guided-rec] supported mimeType picked=' + (mimeType || '(browser default)'));
+    try {
+      guidedRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType: mimeType })
+        : new MediaRecorder(stream);
+    } catch(mtErr){
+      console.log('[guided-rec] MediaRecorder failed with mimeType, retrying without:', mtErr && mtErr.message);
+      guidedRecorder = new MediaRecorder(stream);
+    }
+    guidedRecMimeType = guidedRecorder.mimeType || mimeType || 'audio/webm';
+    console.log('[guided-rec] recorder.mimeType=' + guidedRecorder.mimeType + ' effective=' + guidedRecMimeType);
     guidedRecorder.ondataavailable = function(e){
       if(e.data && e.data.size > 0) guidedChunks.push(e.data);
     };
     guidedRecorder.onstop = async function(){
       stream.getTracks().forEach(function(t){ t.stop(); });
       guidedRecording = false;
+      stopGuidedRecTimer();
       await releaseWakeLock();
       updateGuidedRecordButton();
       await transcribeGuidedItem();
@@ -1921,12 +1976,15 @@ async function recordGuidedItem(){
       console.log('Guided recorder error:', ev && ev.error);
       stream.getTracks().forEach(function(t){ t.stop(); });
       guidedRecording = false;
+      stopGuidedRecTimer();
       await releaseWakeLock();
       updateGuidedRecordButton();
       showToast('Recording stopped unexpectedly — please re-record');
     };
     guidedRecorder.start();
     guidedRecording = true;
+    guidedRecStartTime = Date.now();
+    guidedRecTimer = setInterval(tickGuidedRecTime, 500);
     await requestWakeLock();
     updateGuidedRecordButton();
   } catch(e){
@@ -1950,11 +2008,14 @@ function updateGuidedRecordButton(){
   var saved = item && guidedData[currentStructure] && guidedData[currentStructure][item.key];
   var hasTranscript = !!(saved && saved.transcript);
   if(guidedRecording){
-    btn.textContent = 'Stop Recording';
+    var elapsed = guidedRecStartTime ? formatRecElapsed(Date.now() - guidedRecStartTime) : '0:00';
+    btn.innerHTML = '<span class="rec-indicator"></span>Stop &nbsp;<span id="guided-rec-time" style="font-variant-numeric:tabular-nums">' + elapsed + '</span>';
     btn.style.background = '#DC2626';
+    btn.classList.add('rec-active');
   } else {
     btn.textContent = hasTranscript ? 'Re-record' : 'Record';
     btn.style.background = '#E8763A';
+    btn.classList.remove('rec-active');
   }
 }
 
@@ -1968,7 +2029,8 @@ async function transcribeGuidedItem(){
   }
   showToast('Transcribing...');
   try {
-    var mime = (guidedRecorder && guidedRecorder.mimeType) || 'audio/webm';
+    var mime = (guidedRecorder && guidedRecorder.mimeType) || guidedRecMimeType || 'audio/webm';
+    console.log('[guided-rec] transcribe blob mime=' + mime + ' chunks=' + guidedChunks.length);
     var blob = new Blob(guidedChunks, { type: mime });
     var text = await whisperTranscribe(blob);
     if(!guidedData[structure]) guidedData[structure] = {};
@@ -1988,8 +2050,13 @@ async function transcribeGuidedItem(){
     }
     showToast('Saved ✓');
   } catch(e){
-    console.log('Guided transcribe failed:', e && e.message);
-    showToast('Transcription failed — please re-record');
+    var msg = (e && e.message) || '';
+    console.log('Guided transcribe failed:', msg);
+    if(/format|Invalid file|unsupported|codec/i.test(msg)){
+      showToast('Recording format issue — please try again. If it keeps happening, use freeform.');
+    } else {
+      showToast('Transcription failed — please re-record');
+    }
   }
 }
 
@@ -3470,14 +3537,22 @@ function toggleRec(){
   }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
     achunks = [];
-    mrec = new MediaRecorder(stream);
+    var mimeType = getSupportedMimeType();
+    console.log('[freeform-rec] supported mimeType picked=' + (mimeType || '(browser default)'));
+    try {
+      mrec = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
+    } catch(mtErr){
+      console.log('[freeform-rec] retry without mimeType:', mtErr && mtErr.message);
+      mrec = new MediaRecorder(stream);
+    }
+    console.log('[freeform-rec] recorder.mimeType=' + mrec.mimeType);
     mrec.ondataavailable = function(e){ achunks.push(e.data); };
     mrec.onstop = function(){
       stream.getTracks().forEach(function(t){ t.stop(); });
       clearInterval(rtimer);
       releaseWakeLock();
       if(audioURL){ URL.revokeObjectURL(audioURL); audioURL = null; }
-      audioBlob = new Blob(achunks, {type: mrec.mimeType || 'audio/webm'});
+      audioBlob = new Blob(achunks, {type: mrec.mimeType || mimeType || 'audio/webm'});
       audioURL = URL.createObjectURL(audioBlob);
       document.getElementById('rec-audio').src = audioURL;
       document.getElementById('recplayback').style.display = 'block';
@@ -3701,12 +3776,20 @@ function toggleEditRec(){
   }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
     eachunks = [];
-    emrec = new MediaRecorder(stream);
+    var editMime = getSupportedMimeType();
+    console.log('[edit-rec] supported mimeType picked=' + (editMime || '(browser default)'));
+    try {
+      emrec = editMime ? new MediaRecorder(stream, { mimeType: editMime }) : new MediaRecorder(stream);
+    } catch(mtErr){
+      console.log('[edit-rec] retry without mimeType:', mtErr && mtErr.message);
+      emrec = new MediaRecorder(stream);
+    }
+    console.log('[edit-rec] recorder.mimeType=' + emrec.mimeType);
     emrec.ondataavailable = function(e){ eachunks.push(e.data); };
     emrec.onstop = function(){
       stream.getTracks().forEach(function(t){ t.stop(); });
       releaseWakeLock();
-      var blob = new Blob(eachunks, {type: emrec.mimeType || 'audio/webm'});
+      var blob = new Blob(eachunks, {type: emrec.mimeType || editMime || 'audio/webm'});
       setPill('edit-status','Transcribing edit...','work');
       whisperTranscribe(blob).then(function(text){
         document.getElementById('edit-text').value = text;
