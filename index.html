@@ -678,6 +678,9 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
       <div class="secbody">
         <p style="font-size:13px;color:var(--muted);margin-bottom:10px">Review and edit each section before generating the PDF.</p>
         <button class="pbtn preview-cta" onclick="openPreview()">&#128196; Preview Report</button>
+        <div style="text-align:right;margin:-6px 0 10px">
+          <a href="#" onclick="event.preventDefault();openVersionHistory()" style="font-size:11px;color:#9CA3AF;text-decoration:underline;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:0.5px">Version history</a>
+        </div>
         <div class="editbar">
           <button id="edit-rec-btn" class="micbtn" onclick="toggleEditRec()" title="Voice edit">&#127897;</button>
           <input id="edit-text" type="text" placeholder="Type an edit instruction or tap mic...">
@@ -2994,6 +2997,7 @@ function autoSaveJob(){
     var i = jobs.findIndex(function(j){ return j.id === cid; });
     if(i >= 0) jobs[i] = d; else jobs.push(d);
     saveJobsStore();
+    snapshotJob(cid);
   } catch(e){ console.log('Auto-save failed:', e && e.message); }
 }
 
@@ -3148,14 +3152,17 @@ function markPdfGenerated(){
 
 function markComplete(){
   if(!cid){ showToast('No job open'); return; }
+  if(jobLoading){ showToast('Still loading — try again in a moment'); return; }
   var existing = jobs.find(function(j){ return j.id === cid; });
   var d = getJobData();
+  d = safeMergeJob(d, existing);
   d.status = 'completed';
   d.completedAt = Date.now();
   if(existing && existing.invoiced) d.invoiced = true;
   var i = jobs.findIndex(function(j){ return j.id === cid; });
   if(i >= 0) jobs[i] = d; else jobs.push(d);
   saveJobsStore();
+  snapshotJob(cid, { force: true, reason: 'mark-complete' });
   showToast('Report marked as complete');
   cid = null;
   sessionStorage.removeItem('tr_open_id');
@@ -3503,6 +3510,152 @@ function safeMergeJob(incoming, existing){
     console.warn('[save-merge] preserved ' + preserved.length + ' field(s) from existing to prevent data loss (cid=' + (incoming && incoming.id) + '): ' + preserved.slice(0, 12).join(', ') + (preserved.length > 12 ? ' …' : ''));
   }
   return merged;
+}
+
+var lastSnapshotAt = {};
+var SNAPSHOT_DEBOUNCE_MS = 120000;
+var SNAPSHOT_KEEP = 10;
+
+async function snapshotJob(jobId, opts){
+  opts = opts || {};
+  if(!supa || !jobId) return;
+  var j = jobs.find(function(x){ return x.id === jobId; });
+  if(!j) return;
+  if(isJobContentEmpty(j)) return;
+  var now = Date.now();
+  var last = lastSnapshotAt[jobId] || 0;
+  if(!opts.force && (now - last) < SNAPSHOT_DEBOUNCE_MS) return;
+  try {
+    var sess = await supa.auth.getSession();
+    var userId = sess && sess.data && sess.data.session && sess.data.session.user && sess.data.session.user.id;
+    if(!userId) return;
+    var snap = {};
+    for(var k in j){ if(j.hasOwnProperty(k) && k !== 'photos') snap[k] = j[k]; }
+    snap.photos = (j.photos || []).map(function(p){
+      return { id:p.id||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0, cloudPath:p.cloudPath||'' };
+    });
+    var res = await supa.from('job_versions').insert({ job_id: jobId, user_id: userId, data: snap });
+    if(res && res.error){
+      console.log('[snapshot] insert failed:', res.error.message);
+      return;
+    }
+    lastSnapshotAt[jobId] = now;
+    console.log('[snapshot] saved for job=' + jobId + (opts.reason ? ' reason=' + opts.reason : ''));
+    pruneJobVersions(jobId);
+  } catch(e){
+    console.log('[snapshot] error:', e && e.message);
+  }
+}
+
+async function pruneJobVersions(jobId){
+  if(!supa || !jobId) return;
+  try {
+    var res = await supa.from('job_versions').select('id, created_at').eq('job_id', jobId).order('created_at', { ascending: false });
+    if(res && res.error){ console.log('[snapshot] prune fetch failed:', res.error.message); return; }
+    var rows = (res && res.data) || [];
+    if(rows.length <= SNAPSHOT_KEEP) return;
+    var toDelete = rows.slice(SNAPSHOT_KEEP).map(function(r){ return r.id; });
+    var del = await supa.from('job_versions').delete().in('id', toDelete);
+    if(del && del.error){ console.log('[snapshot] prune delete failed:', del.error.message); return; }
+    console.log('[snapshot] pruned ' + toDelete.length + ' old version(s) for job=' + jobId);
+  } catch(e){
+    console.log('[snapshot] prune error:', e && e.message);
+  }
+}
+
+function summariseSnapshotContent(data){
+  if(!data) return 'empty';
+  var parts = [];
+  var LABELS = { transcript:'transcript', notes:'notes', aiScope:'scope', aiFindings:'findings', aiEntry:'entry', aiCausation:'causation', aiEventDamage:'event damage', aiIssue:'issue', aiWorks:'works', aiLimitations:'limitations', aiMaint:'maintenance', aiRecs:'recs', aiConclusion:'conclusion' };
+  Object.keys(LABELS).forEach(function(f){
+    if(hasStr(data[f])) parts.push(LABELS[f]);
+  });
+  var guided = countGuidedTranscripts(data.guidedData);
+  if(guided > 0) parts.push('guided x' + guided);
+  var photoCount = Array.isArray(data.photos) ? data.photos.length : 0;
+  if(photoCount > 0) parts.push('photos x' + photoCount);
+  return parts.length ? parts.join(' · ') : 'empty';
+}
+
+async function openVersionHistory(){
+  if(!cid){ showToast('No job open'); return; }
+  if(!supa){ showToast('Not connected'); return; }
+  var host = document.getElementById('version-history-modal');
+  if(host) host.parentNode.removeChild(host);
+  var wrap = document.createElement('div');
+  wrap.id = 'version-history-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(28,26,24,0.65);display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,BlinkMacSystemFont,sans-serif';
+  wrap.innerHTML =
+    '<div style="background:#FFFFFF;border-radius:12px;max-width:640px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
+      '<div style="padding:14px 18px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between">' +
+        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;color:#1C1A18">Version History</div>' +
+        '<button id="vh-close" style="background:none;border:none;font-size:22px;color:#6B7280;cursor:pointer;padding:0 4px;line-height:1">&times;</button>' +
+      '</div>' +
+      '<div id="vh-body" style="flex:1;overflow:auto;padding:0"></div>' +
+      '<div style="padding:12px 18px;border-top:1px solid #E5E7EB;display:flex;gap:8px;justify-content:flex-end">' +
+        '<button id="vh-dismiss" class="sbtn" style="min-height:40px">Close</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(wrap);
+  function close(){ if(wrap.parentNode) wrap.parentNode.removeChild(wrap); }
+  document.getElementById('vh-close').onclick = close;
+  document.getElementById('vh-dismiss').onclick = close;
+  var body = document.getElementById('vh-body');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#6B7280;font-size:13px">Loading versions…</div>';
+  try {
+    var res = await supa.from('job_versions').select('id, created_at, data').eq('job_id', cid).order('created_at', { ascending: false }).limit(SNAPSHOT_KEEP);
+    if(res && res.error){
+      body.innerHTML = '<div style="padding:24px;text-align:center;color:#DC2626;font-size:13px">Failed to load: ' + esc(res.error.message) + '</div>';
+      return;
+    }
+    var rows = (res && res.data) || [];
+    if(!rows.length){
+      body.innerHTML = '<div style="padding:24px;text-align:center;color:#6B7280;font-size:13px">No saved versions yet.<br><span style="font-size:11px;color:#9CA3AF">Snapshots are created automatically after report generation, transcription, and periodic edits.</span></div>';
+      return;
+    }
+    var html = '';
+    rows.forEach(function(row){
+      var ts = Date.parse(row.created_at);
+      var when = ts ? formatRelative(ts) : row.created_at;
+      var summary = summariseSnapshotContent(row.data || {});
+      html += '<div style="padding:14px 18px;border-bottom:1px solid #F3F4F6;display:flex;align-items:center;gap:12px">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:13px;color:#1C1A18;text-transform:uppercase;letter-spacing:0.5px">' + esc(when) + '</div>' +
+          '<div style="font-size:12px;color:#6B7280;margin-top:4px;line-height:1.4">' + esc(summary) + '</div>' +
+        '</div>' +
+        '<button class="sbtn" style="min-height:38px" onclick="restoreJobVersion(\'' + row.id + '\')">Restore</button>' +
+      '</div>';
+    });
+    body.innerHTML = html;
+  } catch(e){
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:#DC2626;font-size:13px">Error: ' + esc((e && e.message) || String(e)) + '</div>';
+  }
+}
+
+async function restoreJobVersion(versionId){
+  if(!cid || !supa) return;
+  if(!confirm('Restore this version? Your current state will be snapshotted first so this can be undone.')) return;
+  try {
+    await snapshotJob(cid, { force: true, reason: 'pre-restore' });
+    var res = await supa.from('job_versions').select('data').eq('id', versionId).maybeSingle();
+    if(res && res.error){ showToast('Restore failed: ' + res.error.message); return; }
+    if(!res || !res.data || !res.data.data){ showToast('Version not found'); return; }
+    var snapshot = res.data.data;
+    snapshot.id = cid;
+    snapshot.updatedAt = Date.now();
+    var i = jobs.findIndex(function(j){ return j.id === cid; });
+    if(i >= 0) jobs[i] = snapshot; else jobs.push(snapshot);
+    saveJobsStore();
+    var host = document.getElementById('version-history-modal');
+    if(host) host.parentNode.removeChild(host);
+    showToast('Version restored');
+    var restoredId = cid;
+    cid = null;
+    openJob(restoredId);
+  } catch(e){
+    showToast('Restore failed');
+    console.log('[snapshot] restore error:', e && e.message);
+  }
 }
 
 function isJobContentEmpty(j){
@@ -3944,6 +4097,7 @@ function runTranscription(){
     updateRewriteVisibility();
     setPill('voice-status','Transcript captured - record more, retake, or generate','done');
     saveJob();
+    if(cid) snapshotJob(cid, { force: true, reason: 'transcript' });
     if(typeof runChecklistGapAnalysis === 'function') runChecklistGapAnalysis(tEl.textContent || '');
   }).catch(function(e){
     var msg = (e && e.message) || 'Unknown error';
@@ -4027,6 +4181,7 @@ function runReportGen(transcript, opts){
     setPill('expand-status','Report sections written - review below','done');
     showToast('Report sections generated');
     saveJob();
+    if(cid) snapshotJob(cid, { force: true, reason: 'report-gen' });
   })
   .catch(function(e){ setPill('expand-status','Error: '+e.message,'err'); throw e; })
   .finally(function(){ busy=false; document.getElementById('gen-btn').disabled=false; });
