@@ -2969,6 +2969,7 @@ function saveDraftBtn(){
       showToast('Save blocked — form appears empty');
       return;
     }
+    d = safeMergeJob(d, existing);
     var i = jobs.findIndex(function(j){ return j.id===cid; });
     if(i>=0) jobs[i]=d; else jobs.push(d);
     saveJobsStore();
@@ -2989,6 +2990,7 @@ function autoSaveJob(){
       console.warn('[autoSave] BLOCKED: refusing to overwrite populated content with empty snapshot (cid=' + cid + ')');
       return;
     }
+    d = safeMergeJob(d, existing);
     var i = jobs.findIndex(function(j){ return j.id === cid; });
     if(i >= 0) jobs[i] = d; else jobs.push(d);
     saveJobsStore();
@@ -3060,6 +3062,8 @@ function saveJob(status){
     console.warn('[saveJob] BLOCKED: refusing to overwrite populated content with empty snapshot (cid=' + cid + ')');
     return;
   }
+  d = safeMergeJob(d, existing);
+  if(status) d.status = status;
   var i = jobs.findIndex(function(j){ return j.id===cid; });
   if(i>=0) jobs[i]=d; else jobs.push(d);
   saveJobsStore();
@@ -3410,6 +3414,95 @@ function newJob(){
   document.getElementById('form-title').textContent = 'New Report';
   document.getElementById('gen-name').textContent = 'New Report';
   goView('form');
+}
+
+var JOB_TEXT_FIELDS = ['transcript','notes','aiScope','aiFindings','aiEntry','aiCausation','aiEventDamage','aiIssue','aiWorks','aiLimitations','aiMaint','aiRecs','aiConclusion'];
+
+function hasStr(v){ return typeof v === 'string' && v.trim() !== ''; }
+
+function countGuidedTranscripts(g){
+  if(!g || typeof g !== 'object') return 0;
+  var n = 0;
+  Object.keys(g).forEach(function(s){
+    var struct = g[s] || {};
+    Object.keys(struct).forEach(function(k){
+      var d = struct[k];
+      if(d && hasStr(d.transcript)) n++;
+    });
+  });
+  return n;
+}
+
+function countPopulatedContent(job){
+  if(!job) return 0;
+  var n = 0;
+  JOB_TEXT_FIELDS.forEach(function(f){ if(hasStr(job[f])) n++; });
+  n += countGuidedTranscripts(job.guidedData);
+  return n;
+}
+
+// Per-field merge that blocks silent multi-field deletions caused by
+// unloaded / partial-state saves. Single-field deletions still pass
+// through (treated as intentional user edits).
+function safeMergeJob(incoming, existing){
+  if(!existing) return incoming;
+  var oldCount = countPopulatedContent(existing);
+  var newCount = countPopulatedContent(incoming);
+  var lost = oldCount - newCount;
+  if(lost < 2) return incoming;
+
+  var merged = Object.assign({}, incoming);
+  var preserved = [];
+  JOB_TEXT_FIELDS.forEach(function(f){
+    if(hasStr(existing[f]) && !hasStr(merged[f])){
+      merged[f] = existing[f];
+      preserved.push(f);
+    }
+  });
+
+  var existingGuided = existing.guidedData;
+  if(existingGuided && typeof existingGuided === 'object'){
+    var mergedGuided = (merged.guidedData && typeof merged.guidedData === 'object')
+      ? JSON.parse(JSON.stringify(merged.guidedData))
+      : {};
+    Object.keys(existingGuided).forEach(function(s){
+      var oldStruct = existingGuided[s] || {};
+      Object.keys(oldStruct).forEach(function(k){
+        var oldItem = oldStruct[k] || {};
+        if(!hasStr(oldItem.transcript)) return;
+        var newItem = mergedGuided[s] && mergedGuided[s][k];
+        if(newItem && hasStr(newItem.transcript)) return;
+        if(!mergedGuided[s]) mergedGuided[s] = {};
+        var target = mergedGuided[s][k] ? Object.assign({}, mergedGuided[s][k]) : {};
+        target.transcript = oldItem.transcript;
+        if(!hasStr(target.extra) && hasStr(oldItem.extra)) target.extra = oldItem.extra;
+        if(oldItem.skipped && target.skipped == null) target.skipped = false;
+        mergedGuided[s][k] = target;
+        preserved.push('guidedData/' + s + '/' + k);
+      });
+    });
+    merged.guidedData = mergedGuided;
+
+    var existingStructs = Array.isArray(existing.structures) ? existing.structures : [];
+    var mergedStructs = Array.isArray(merged.structures) ? merged.structures.slice() : [];
+    existingStructs.forEach(function(s){
+      if(mergedStructs.indexOf(s) === -1 && Object.keys(existingGuided[s] || {}).length){
+        mergedStructs.push(s);
+        preserved.push('structures/' + s);
+      }
+    });
+    if(mergedStructs.length) merged.structures = mergedStructs;
+  }
+
+  if((existing.photos || []).length > 0 && (merged.photos || []).length === 0){
+    merged.photos = existing.photos;
+    preserved.push('photos');
+  }
+
+  if(preserved.length){
+    console.warn('[save-merge] preserved ' + preserved.length + ' field(s) from existing to prevent data loss (cid=' + (incoming && incoming.id) + '): ' + preserved.slice(0, 12).join(', ') + (preserved.length > 12 ? ' …' : ''));
+  }
+  return merged;
 }
 
 function isJobContentEmpty(j){
