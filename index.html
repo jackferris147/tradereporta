@@ -3380,9 +3380,167 @@ function newJob(){
   goView('form');
 }
 
+function isJobContentEmpty(j){
+  if(!j) return false;
+  var strFields = ['transcript','notes','aiScope','aiFindings','aiEntry','aiCausation','aiEventDamage','aiIssue','aiWorks','aiLimitations','aiMaint','aiRecs','aiConclusion'];
+  for(var i = 0; i < strFields.length; i++){
+    if(typeof j[strFields[i]] === 'string' && j[strFields[i]].trim() !== '') return false;
+  }
+  var g = j.guidedData || {};
+  for(var s in g){
+    if(!g.hasOwnProperty(s) || !g[s]) continue;
+    for(var k in g[s]){
+      if(!g[s].hasOwnProperty(k) || !g[s][k]) continue;
+      var d = g[s][k];
+      if((d.transcript && d.transcript.trim()) || (d.extra && d.extra.trim())) return false;
+    }
+  }
+  return true;
+}
+
+function fmtTs(ms){
+  if(!ms) return '(none)';
+  try { return new Date(ms).toISOString() + ' (ms=' + ms + ')'; }
+  catch(e){ return String(ms); }
+}
+
+function summariseJobContent(j, label){
+  var out = [];
+  if(!j){
+    out.push('[' + label + '] no entry');
+    return out;
+  }
+  out.push('[' + label + '] id=' + j.id);
+  out.push('  status=' + j.status + ' type=' + j.type + ' invoiced=' + !!j.invoiced);
+  out.push('  updatedAt=' + fmtTs(j.updatedAt));
+  var fields = ['transcript','notes','aiScope','aiFindings','aiEntry','aiCausation','aiEventDamage','aiIssue','aiWorks','aiLimitations','aiMaint','aiRecs','aiConclusion'];
+  fields.forEach(function(f){
+    var v = j[f];
+    var len = (typeof v === 'string') ? v.length : (v == null ? 0 : String(v).length);
+    var preview = (typeof v === 'string') ? v.slice(0, 80).replace(/\s+/g, ' ') : '';
+    out.push('  ' + f + ' len=' + len + (preview ? ' preview="' + preview + (v.length > 80 ? '…' : '') + '"' : ''));
+  });
+  var g = j.guidedData || {};
+  var gKeys = Object.keys(g);
+  var totalItems = 0, itemsWithTranscript = 0;
+  gKeys.forEach(function(s){
+    var struct = g[s] || {};
+    Object.keys(struct).forEach(function(k){
+      totalItems++;
+      var d = struct[k] || {};
+      if(d.transcript && d.transcript.trim()) itemsWithTranscript++;
+    });
+  });
+  out.push('  guidedMode=' + !!j.guidedMode + ' structures=' + JSON.stringify(j.structures || []) + ' currentStructure=' + (j.currentStructure || '(none)'));
+  out.push('  guidedData: structures=' + gKeys.length + ' totalItems=' + totalItems + ' withTranscript=' + itemsWithTranscript);
+  if(gKeys.length){
+    gKeys.forEach(function(s){
+      var struct = g[s] || {};
+      var keys = Object.keys(struct);
+      out.push('    structure "' + s + '" items=' + keys.length);
+      keys.forEach(function(k){
+        var d = struct[k] || {};
+        var tLen = (d.transcript || '').length;
+        var xLen = (d.extra || '').length;
+        out.push('      ' + k + ' transcriptLen=' + tLen + ' extraLen=' + xLen + ' skipped=' + !!d.skipped);
+      });
+    });
+  }
+  out.push('  photoCount(field)=' + (j.photoCount || 0) + ' photos.length=' + (Array.isArray(j.photos) ? j.photos.length : '(no field)'));
+  return out;
+}
+
+async function runJobContentDiag(id){
+  var lines = [];
+  function push(s){ lines.push(s); console.log('[content-diag] ' + s); }
+
+  push('--- job content diagnostic for id=' + id + ' ---');
+
+  var inMem = jobs.find(function(x){ return x.id === id; });
+  summariseJobContent(inMem, 'in-memory jobs[]').forEach(push);
+
+  try {
+    var raw = localStorage.getItem('tr_jobs');
+    var ls = raw ? JSON.parse(raw) : null;
+    var lsJob = Array.isArray(ls) ? ls.find(function(x){ return x.id === id; }) : null;
+    summariseJobContent(lsJob, 'localStorage tr_jobs').forEach(push);
+  } catch(e){
+    push('[localStorage] read error: ' + (e && e.message));
+  }
+
+  try {
+    if(supa){
+      var res = await supa.from('jobs').select('id,data,updated_at').eq('id', id).maybeSingle();
+      if(res && res.error){
+        push('[cloud] query error: ' + res.error.message);
+      } else if(!res || !res.data){
+        push('[cloud] no row for id=' + id);
+      } else {
+        var row = res.data;
+        var cloudJob = (row.data && typeof row.data === 'object') ? Object.assign({ id: row.id }, row.data) : { id: row.id };
+        push('[cloud] row column updated_at=' + row.updated_at);
+        summariseJobContent(cloudJob, 'cloud jobs.data').forEach(push);
+      }
+    } else {
+      push('[cloud] supa client not ready');
+    }
+  } catch(e){
+    push('[cloud] fetch error: ' + (e && e.message));
+  }
+
+  push('--- end diagnostic ---');
+  push('NOTE: IndexedDB stores photos only, not transcripts or AI report sections. If both localStorage and cloud show empty text/AI fields with the same recent updatedAt, an empty save has overwritten the previous content on both sides.');
+
+  showJobContentDiagModal(lines.join('\n'));
+}
+
+function showJobContentDiagModal(text){
+  var existing = document.getElementById('content-diag-modal');
+  if(existing) existing.parentNode.removeChild(existing);
+  var wrap = document.createElement('div');
+  wrap.id = 'content-diag-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(28,26,24,0.65);display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,BlinkMacSystemFont,sans-serif';
+  wrap.innerHTML =
+    '<div style="background:#FFFFFF;border-radius:12px;max-width:640px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
+      '<div style="padding:14px 18px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between">' +
+        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;color:#1C1A18">Job Content Diagnostic</div>' +
+        '<button id="cdiag-close" style="background:none;border:none;font-size:22px;color:#6B7280;cursor:pointer;padding:0 4px;line-height:1">&times;</button>' +
+      '</div>' +
+      '<pre id="cdiag-body" style="flex:1;overflow:auto;margin:0;padding:14px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.55;white-space:pre-wrap;word-break:break-all;color:#1C1A18;background:#FAFAFA"></pre>' +
+      '<div style="padding:12px 18px;border-top:1px solid #E5E7EB;display:flex;gap:8px;justify-content:flex-end">' +
+        '<button id="cdiag-copy" class="sbtn" style="min-height:40px">Copy</button>' +
+        '<button id="cdiag-dismiss" class="pbtn" style="min-height:40px">Close</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(wrap);
+  document.getElementById('cdiag-body').textContent = text;
+  function close(){ if(wrap.parentNode) wrap.parentNode.removeChild(wrap); }
+  document.getElementById('cdiag-close').onclick = close;
+  document.getElementById('cdiag-dismiss').onclick = close;
+  document.getElementById('cdiag-copy').onclick = function(){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(
+        function(){ showToast('Diagnostic copied'); },
+        function(){
+          var b = document.getElementById('cdiag-body');
+          var r = document.createRange(); r.selectNodeContents(b);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+          showToast('Selected — long-press to copy');
+        }
+      );
+    } else {
+      var b = document.getElementById('cdiag-body');
+      var r = document.createRange(); r.selectNodeContents(b);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      showToast('Selected — long-press to copy');
+    }
+  };
+}
+
 function openJob(id){
   var j = jobs.find(function(x){ return x.id===id; }); if(!j) return;
   cid=id; jtype=j.type||'roof';
+  if(isJobContentEmpty(j)) runJobContentDiag(id);
   clearForm();
   setType(jtype);
   sv('f-client',j.client); sv('f-ref',j.ref); sv('f-cm',j.cm); sv('f-cmemail',j.cmemail);
