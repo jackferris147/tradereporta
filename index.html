@@ -2954,9 +2954,21 @@ function saveJobsStore(syncId){
 }
 
 function saveDraftBtn(){
+  if(!cid){ showToast('No job open'); return; }
+  if(jobLoading){
+    console.warn('[saveDraft] BLOCKED: job still loading (cid=' + cid + ')');
+    showToast('Still loading — try again in a moment');
+    return;
+  }
   try {
     markEdited();
     var d = getJobData();
+    var existing = jobs.find(function(j){ return j.id === cid; });
+    if(existing && !isJobContentEmpty(existing) && isJobContentEmpty(d)){
+      console.warn('[saveDraft] BLOCKED: refusing to overwrite populated content with empty snapshot (cid=' + cid + ')');
+      showToast('Save blocked — form appears empty');
+      return;
+    }
     var i = jobs.findIndex(function(j){ return j.id===cid; });
     if(i>=0) jobs[i]=d; else jobs.push(d);
     saveJobsStore();
