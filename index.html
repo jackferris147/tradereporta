@@ -4221,7 +4221,7 @@ function runReportGen(transcript, opts){
   var userMsg = 'Inspection type: ' + typeLbl + ' | Address: ' + addr + '\n\n' + contextBlock + 'Transcript:\n' + clean;
   return callAI({
     model: 'claude-sonnet-4-6',
-    max_tokens: 2000,
+    max_tokens: 8000,
     system: systemPrompt,
     messages: [{role:'user', content: userMsg}]
   })
@@ -4381,7 +4381,7 @@ function applyEdit(){
   document.getElementById('edit-apply-btn').disabled = true;
   callAI({
     model: 'claude-sonnet-4-6',
-    max_tokens: 2000,
+    max_tokens: 8000,
     system: EDIT_SYSTEM_PROMPT,
     messages: [{role:'user', content: userMsg}]
   })
