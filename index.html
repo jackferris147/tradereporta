@@ -782,6 +782,7 @@ var jobs = (function(){
   } catch(e){ return []; }
 })();
 var cid = null, jtype = 'roof', photos = [], busy = false, photosLoaded = false;
+var jobLoading = false;
 var eventRelated = false;
 var pdfBlobCache = { jobId: null, blob: null };
 var mrec = null, achunks = [], rtimer = null, rsecs = 0;
@@ -2965,8 +2966,17 @@ function saveDraftBtn(){
 
 function autoSaveJob(){
   if(!cid) return;
+  if(jobLoading){
+    console.warn('[autoSave] BLOCKED: job still loading (cid=' + cid + ')');
+    return;
+  }
   try {
     var d = getJobData();
+    var existing = jobs.find(function(j){ return j.id === cid; });
+    if(existing && !isJobContentEmpty(existing) && isJobContentEmpty(d)){
+      console.warn('[autoSave] BLOCKED: refusing to overwrite populated content with empty snapshot (cid=' + cid + ')');
+      return;
+    }
     var i = jobs.findIndex(function(j){ return j.id === cid; });
     if(i >= 0) jobs[i] = d; else jobs.push(d);
     saveJobsStore();
@@ -3026,8 +3036,18 @@ function getJobData(){
 }
 
 function saveJob(status){
+  if(!cid) return;
+  if(jobLoading){
+    console.warn('[saveJob] BLOCKED: job still loading (cid=' + cid + ')');
+    return;
+  }
   markEdited();
   var d = getJobData(); if(status) d.status = status;
+  var existing = jobs.find(function(j){ return j.id===cid; });
+  if(existing && !isJobContentEmpty(existing) && isJobContentEmpty(d) && !status){
+    console.warn('[saveJob] BLOCKED: refusing to overwrite populated content with empty snapshot (cid=' + cid + ')');
+    return;
+  }
   var i = jobs.findIndex(function(j){ return j.id===cid; });
   if(i>=0) jobs[i]=d; else jobs.push(d);
   saveJobsStore();
@@ -3539,6 +3559,7 @@ function showJobContentDiagModal(text){
 
 function openJob(id){
   var j = jobs.find(function(x){ return x.id===id; }); if(!j) return;
+  jobLoading = true;
   cid=id; jtype=j.type||'roof';
   if(isJobContentEmpty(j)) runJobContentDiag(id);
   clearForm();
@@ -3584,7 +3605,7 @@ function openJob(id){
   goView('form');
   var openCid = id;
   idbGet(id).then(function(arr){
-    if(cid !== openCid) return;
+    if(cid !== openCid){ if(cid == null) jobLoading = false; return; }
     var src = (arr && arr.length) ? arr : (j.photos||[]);
     photos = src.map(function(p){ return {id:p.id||'', url:p.url||'', cap:p.cap||'', orientation:p.orientation||'', width:p.width||0, height:p.height||0, cloudPath:p.cloudPath||'', loading:false}; });
     var srcLabel = (arr && arr.length) ? 'idb' : 'jobs.data';
@@ -3597,6 +3618,7 @@ function openJob(id){
     }
     j.photos = photos;
     photosLoaded = true;
+    jobLoading = false;
     hydratePhotosFromCloud();
     backfillPhotoUploads();
   });
