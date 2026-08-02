@@ -2222,6 +2222,10 @@ function resetGuidedState(){
   guidedMode = true;
   var chk = document.getElementById('freeform-toggle');
   if(chk) chk.checked = false;
+  var reviewEl = document.getElementById('guided-review');
+  if(reviewEl){ reviewEl.innerHTML = ''; reviewEl.style.display = 'none'; }
+  var stepEl = document.getElementById('guided-step');
+  if(stepEl) stepEl.innerHTML = '';
   rebuildStructureSelect();
 }
 
