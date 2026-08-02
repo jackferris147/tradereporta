@@ -609,6 +609,7 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
               style="background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;font-family:'Barlow Condensed';font-weight:700;font-size:14px;color:#1C1A18;text-transform:uppercase;letter-spacing:0.5px;min-height:44px">
               <option value="Main Roof">Main Roof</option>
             </select>
+            <button class="sbtn" id="structure-material-btn" onclick="cycleStructureMaterial()" style="padding:8px 14px;min-height:44px" title="Switch material for this structure">Metal</button>
             <button class="sbtn" onclick="addStructure()" style="padding:8px 14px;min-height:44px">+ Add</button>
             <button class="sbtn" id="remove-structure-btn" onclick="removeStructure()" style="padding:8px 14px;min-height:44px" title="Remove current structure">Remove</button>
           </div>
@@ -844,7 +845,7 @@ function buildReportSystemPrompt(jt, evt, brandCompany){
   if(isLeak){
     lines.push("Write as an experienced Australian roofing tradesman explaining findings to an insurance assessor or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.");
   } else if(isEvent){
-    lines.push("Write as an experienced Australian roofing tradesman explaining findings from an inspection following a specific damage event (storm, hail, impact). The audience may be an insurance assessor, strata manager or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.");
+    lines.push("Write as an experienced Australian roofing tradesman explaining findings from an inspection following a specific damage event. Storm/event damage takes many forms - hail, wind-lifted or missing sheets or tiles, impact from fallen trees, branches or airborne debris - describe whatever is actually present rather than assuming hail. The audience may be an insurance assessor, strata manager or property owner. Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.");
   } else {
     lines.push("Write as an experienced Australian roofing tradesman documenting the condition of the roof for the property manager or owner. The report should suit any client (insurance, strata, private). Use plain clear language. Each finding should tell the reader what was found, where it is, and why it is significant. Avoid jargon where possible.");
   }
@@ -869,7 +870,7 @@ function buildReportSystemPrompt(jt, evt, brandCompany){
   lines.push("- Rusted fixings + loose fixings + general fixing condition = ONE row");
   lines.push("- Multiple penetrations in similar condition = ONE row");
   if(isEvent){
-    lines.push("Only create separate rows when findings are genuinely distinct defects in different locations, or when hail damage is involved (hail damage always gets its own row as it is a primary claim item), or when you specifically call something out as a major or serious issue.");
+    lines.push("Only create separate rows when findings are genuinely distinct defects in different locations, or when event damage is involved (event damage such as hail, wind, impact or fallen debris always gets its own row as it is a primary claim item), or when you specifically call something out as a major or serious issue.");
     lines.push("Keep each finding to one clear sentence describing what was found and where. Only add severity or context when it is significant or directly relevant to the claim.");
   } else {
     lines.push("Only create separate rows when findings are genuinely distinct defects in different locations, or when you specifically call something out as a major or serious issue.");
@@ -880,7 +881,7 @@ function buildReportSystemPrompt(jt, evt, brandCompany){
     lines.push("- Causation: why the issues happened, reference findings by area rather than repeating them word for word.");
   }
   if(isEvent){
-    lines.push("- Event Damage: describe the damage caused by the specific event (storm, hail, impact). Two paragraphs maximum. Focus on the nature and extent of the damage found. Do NOT list unrelated maintenance items here.");
+    lines.push("- Event Damage: describe the damage caused by the specific event. Storm/event damage can include hail impacts, wind-lifted or missing sheets or tiles, impact from fallen trees, branches or airborne debris, or other event-caused defects - describe whatever is actually present and its likely cause, do not assume hail. Two paragraphs maximum. Focus on the nature and extent of the damage found. Do NOT list unrelated maintenance items here.");
     lines.push("- Maintenance: Split into two groups using the EXACT sub-headings 'Contributing to Damage:' and 'General Observations:'. Under each sub-heading, list items as clear dot points, one per line, using the same style as a standard maintenance list.");
     lines.push("  - Contributing to Damage: items that made the event damage worse or allowed it to happen. For each item state what was found and where, how long it has likely been present (based on visible condition), whether the insured would reasonably have been aware of it, and what damage it contributed to.");
     lines.push("  - General Observations: pre-existing or unrelated maintenance items. For each state what was found and where. Only mention duration when clearly relevant.");
@@ -902,7 +903,7 @@ function buildReportSystemPrompt(jt, evt, brandCompany){
     lines.push("[CAUSATION] two paragraphs maximum starting with 'Based on our inspection, it is the opinion of " + C + " that...'");
     lines.push("[MAINTENANCE] clear dot points describing each maintenance issue found - what was found and where, plus duration only when clearly relevant; or the sentence 'No maintenance issues were identified during the inspection'");
   } else if(isEvent){
-    lines.push("[EVENT_DAMAGE] two paragraphs maximum describing the specific event damage (storm, hail, impact) found during the inspection.");
+    lines.push("[EVENT_DAMAGE] two paragraphs maximum describing the specific event damage found during the inspection. Cover whatever forms of damage are actually present (hail, wind-lifted or missing material, impact from fallen trees/branches or airborne debris) and note the likely cause. Do not default to hail unless hail was specifically reported.");
     lines.push("[MAINTENANCE] Split into sub-headings. Use the exact labels 'Contributing to Damage:' and 'General Observations:' each on their own line, followed by dot-point items on subsequent lines. Omit a sub-heading entirely if it has no items. If neither category has any items, write exactly: 'No maintenance items were identified during the inspection.'");
   } else {
     lines.push("[MAINTENANCE] clear dot points describing each maintenance item found - what was found and where; or the sentence 'No maintenance items were identified during the inspection'");
@@ -1599,7 +1600,7 @@ var guidedItems = {
     { key: 'penetrations', label: 'Penetrations', hint: 'Vent pipes, antennas, dektites — back trays, seals, flashing' },
     { key: 'valleys', label: 'Valleys', hint: 'Condition, laps, debris' },
     { key: 'gutters', label: 'Gutters & Downpipes', hint: 'Condition, falls, blockages, debris' },
-    { key: 'event', label: 'Hail / Event Damage', hint: 'Extent, % affected, impact marks, chalking needed' },
+    { key: 'event', label: 'Event Damage', hint: 'Storm/event damage — hail, wind-lifted or missing sheets, impact from fallen trees/branches or debris. Note extent, % affected, and what caused it.' },
     { key: 'fixings', label: 'Screws & Fixings', hint: 'Rust, washers, over or under tightened' },
     { key: 'insulation', label: 'Insulation / Sarking', hint: 'Present, condition' }
   ],
@@ -1610,6 +1611,7 @@ var guidedItems = {
     { key: 'ridge', label: 'Ridge', hint: 'Alignment, condition' },
     { key: 'penetrations', label: 'Penetrations', hint: 'Vent pipes, antennas, dektites — seals, flashing' },
     { key: 'gutters', label: 'Gutters & Downpipes', hint: 'Condition, falls, blockages' },
+    { key: 'event', label: 'Event Damage', hint: 'Storm/event damage — cracked or broken tiles from impact, hail, fallen branches/debris, wind-displaced or missing tiles. Note extent, % affected, and what caused it.' },
     { key: 'leadflashings', label: 'Lead Flashings', hint: 'Condition, dressed correctly' },
     { key: 'sarking', label: 'Sarking', hint: 'Present, condition' }
   ],
@@ -1624,10 +1626,24 @@ var guidedItems = {
 
 var structures = ['Main Roof'];
 var currentStructure = 'Main Roof';
+var structureMaterials = {};
 var guidedMode = true;
 var guidedData = {};
 var currentStepIndex = 0;
 var lastGuidedCategory = null;
+
+function deriveMainMaterial(){
+  var rt = preInspectData && preInspectData.roofType;
+  return (rt === 'tile' || rt === 'concrete-tile') ? 'tile' : 'metal';
+}
+
+function materialForStructure(name){
+  var explicit = structureMaterials && structureMaterials[name];
+  if(explicit === 'metal' || explicit === 'tile') return explicit;
+  return deriveMainMaterial();
+}
+
+function materialLabel(mat){ return mat === 'tile' ? 'Tile' : 'Metal'; }
 
 function guidedToChecklistIds(guidedKey){
   var listKey = (typeof activeChecklistKey === 'function') ? activeChecklistKey() : 'metal';
@@ -1687,17 +1703,23 @@ function hasAnyGuidedTranscripts(){
   return false;
 }
 
+function itemsForStructure(name){
+  if(jtype === 'leak') return guidedItems.leak;
+  if(jtype === 'makesafe') return [];
+  return materialForStructure(name) === 'tile' ? guidedItems.tile : guidedItems.metal;
+}
+
 function updateGuidedVerifySummary(){
   var host = document.getElementById('guided-verify-summary');
   if(!host) return;
-  var items = getActiveGuidedSet();
-  if(items.length === 0 || jtype === 'makesafe'){
+  if(jtype === 'makesafe'){
     host.style.display = 'none';
     return;
   }
-  host.style.display = 'block';
-  var covered = 0, skipped = 0, missing = 0;
+  var covered = 0, skipped = 0, missing = 0, total = 0;
   structures.forEach(function(s){
+    var items = itemsForStructure(s);
+    total += items.length;
     items.forEach(function(item){
       var d = (guidedData[s] && guidedData[s][item.key]) || {};
       if(d.transcript) covered++;
@@ -1705,15 +1727,19 @@ function updateGuidedVerifySummary(){
       else missing++;
     });
   });
-  var total = items.length * structures.length;
+  if(total === 0){
+    host.style.display = 'none';
+    return;
+  }
+  host.style.display = 'block';
   host.textContent = covered + ' of ' + total + ' items covered · ' + skipped + ' skipped · ' + missing + ' not addressed';
 }
 
 function getActiveGuidedSet(){
   if(jtype === 'leak') return guidedItems.leak;
   if(jtype === 'makesafe') return [];
-  var rt = preInspectData && preInspectData.roofType;
-  return (rt === 'tile' || rt === 'concrete-tile') ? guidedItems.tile : guidedItems.metal;
+  var mat = materialForStructure(currentStructure);
+  return mat === 'tile' ? guidedItems.tile : guidedItems.metal;
 }
 
 function rebuildStructureSelect(){
@@ -1731,6 +1757,36 @@ function rebuildStructureSelect(){
   sel.value = currentStructure;
   var rmBtn = document.getElementById('remove-structure-btn');
   if(rmBtn) rmBtn.style.display = (structures.length > 1 && currentStructure !== 'Main Roof') ? 'inline-block' : 'none';
+  updateStructureMaterialBtn();
+}
+
+function updateStructureMaterialBtn(){
+  var btn = document.getElementById('structure-material-btn');
+  if(!btn) return;
+  if(jtype !== 'roof'){ btn.style.display = 'none'; return; }
+  btn.style.display = 'inline-block';
+  btn.textContent = materialLabel(materialForStructure(currentStructure));
+}
+
+function cycleStructureMaterial(){
+  if(jtype !== 'roof') return;
+  if(!currentStructure) return;
+  var current = materialForStructure(currentStructure);
+  var next = current === 'tile' ? 'metal' : 'tile';
+  var hadTranscripts = false;
+  if(guidedData[currentStructure]){
+    Object.keys(guidedData[currentStructure]).forEach(function(k){
+      var d = guidedData[currentStructure][k];
+      if(d && d.transcript && d.transcript.trim()) hadTranscripts = true;
+    });
+  }
+  structureMaterials[currentStructure] = next;
+  currentStepIndex = 0;
+  updateStructureMaterialBtn();
+  renderGuidedStep();
+  if(hadTranscripts) showToast('Material switched — existing recordings kept by item key');
+  markEdited();
+  autoSaveJob();
 }
 
 function removeStructure(){
@@ -1739,6 +1795,7 @@ function removeStructure(){
   var name = currentStructure;
   if(!confirm('Remove "' + name + '" and its guided recordings?')) return;
   if(guidedData[name]) delete guidedData[name];
+  if(structureMaterials[name]) delete structureMaterials[name];
   structures = structures.filter(function(s){ return s !== name; });
   currentStructure = structures[0];
   currentStepIndex = 0;
@@ -1756,6 +1813,7 @@ function setCurrentStructure(){
   currentStepIndex = 0;
   var rmBtn = document.getElementById('remove-structure-btn');
   if(rmBtn) rmBtn.style.display = (structures.length > 1 && currentStructure !== 'Main Roof') ? 'inline-block' : 'none';
+  updateStructureMaterialBtn();
   renderGuidedStep();
   markEdited();
   autoSaveJob();
@@ -1766,11 +1824,20 @@ function addStructure(){
   if(!name || !name.trim()) return;
   name = name.trim();
   if(structures.indexOf(name) === -1){
+    var mainMat = deriveMainMaterial();
+    var chosenMat = mainMat;
+    if(jtype === 'roof'){
+      var otherMat = mainMat === 'tile' ? 'metal' : 'tile';
+      var msg = 'What material is "' + name + '"?\n\nOK = ' + materialLabel(mainMat).toUpperCase() + ' (same as main roof)\nCancel = ' + materialLabel(otherMat).toUpperCase();
+      chosenMat = confirm(msg) ? mainMat : otherMat;
+      structureMaterials[name] = chosenMat;
+    }
     structures.push(name);
     rebuildStructureSelect();
     currentStructure = name;
     document.getElementById('current-structure').value = name;
     currentStepIndex = 0;
+    updateStructureMaterialBtn();
     renderGuidedStep();
   }
   markEdited();
@@ -1863,6 +1930,7 @@ function renderGuidedStep(){
   if(jtype === 'roof'){
     lastGuidedCategory = (preInspectData && (preInspectData.roofType === 'tile' || preInspectData.roofType === 'concrete-tile')) ? 'tile' : 'metal';
   }
+  updateStructureMaterialBtn();
   updateGuidedProgress();
   if(guidedRecording) updateGuidedRecordButton();
 }
@@ -2166,12 +2234,18 @@ function backToGuidedSteps(){
 }
 
 function buildGuidedTranscript(){
-  var items = getActiveGuidedSet();
-  if(!items.length) return '';
+  if(jtype === 'makesafe') return '';
   var lines = [];
   structures.forEach(function(structure){
+    var mat = (jtype === 'leak') ? null : materialForStructure(structure);
+    var items;
+    if(jtype === 'leak') items = guidedItems.leak;
+    else items = (mat === 'tile') ? guidedItems.tile : guidedItems.metal;
+    if(!items || !items.length) return;
+    var seen = {};
     var structureLines = [];
     items.forEach(function(item){
+      seen[item.key] = true;
       var d = (guidedData[structure] && guidedData[structure][item.key]) || {};
       if(d.skipped) return;
       var t = (d.transcript || '').trim();
@@ -2181,8 +2255,23 @@ function buildGuidedTranscript(){
       if(x) content += (content ? ' ' : '') + x;
       structureLines.push(item.label + ': ' + content);
     });
+    // Recordings from a previous material assignment for this structure
+    // should still surface (kept by item key) - append at the end.
+    var extras = guidedData[structure] || {};
+    Object.keys(extras).forEach(function(k){
+      if(seen[k]) return;
+      var d = extras[k] || {};
+      if(d.skipped) return;
+      var t = (d.transcript || '').trim();
+      var x = (d.extra || '').trim();
+      if(!t && !x) return;
+      var content = t;
+      if(x) content += (content ? ' ' : '') + x;
+      structureLines.push(k + ': ' + content);
+    });
     if(structureLines.length){
-      lines.push('=== ' + structure + ' ===');
+      var header = mat ? (structure + ' (' + materialLabel(mat) + ')') : structure;
+      lines.push('=== ' + header + ' ===');
       lines.push(structureLines.join('\n'));
     }
   });
@@ -2198,16 +2287,14 @@ function generateReportFromGuided(){
 }
 
 function updateGuidedProgress(){
-  var items = getActiveGuidedSet();
-  var total = items.length * structures.length;
-  var done = 0;
+  var total = 0, done = 0;
   structures.forEach(function(s){
-    if(guidedData[s]){
-      items.forEach(function(it){
-        var d = guidedData[s][it.key];
-        if(d && (d.transcript || d.skipped)) done++;
-      });
-    }
+    var items = itemsForStructure(s);
+    total += items.length;
+    items.forEach(function(it){
+      var d = guidedData[s] && guidedData[s][it.key];
+      if(d && (d.transcript || d.skipped)) done++;
+    });
   });
   var label = document.getElementById('guided-progress');
   if(label) label.textContent = done + ' / ' + total;
@@ -2217,6 +2304,7 @@ function updateGuidedProgress(){
 function resetGuidedState(){
   structures = ['Main Roof'];
   currentStructure = 'Main Roof';
+  structureMaterials = {};
   guidedData = {};
   currentStepIndex = 0;
   guidedMode = true;
@@ -2234,6 +2322,7 @@ function initGuidedForJob(){
   var chk = document.getElementById('freeform-toggle');
   if(chk) chk.checked = !guidedMode;
   updateGuidedVisibility();
+  updateStructureMaterialBtn();
   renderGuidedStep();
   updateGuidedVerifySummary();
 }
@@ -3079,6 +3168,7 @@ function getJobData(){
     checklistState: JSON.parse(JSON.stringify(checklistState || { metal:{}, tile:{}, leak:{}, activeTab:'metal' })),
     structures: (structures || []).slice(),
     currentStructure: currentStructure,
+    structureMaterials: JSON.parse(JSON.stringify(structureMaterials || {})),
     guidedMode: !!guidedMode,
     guidedData: JSON.parse(JSON.stringify(guidedData || {})),
     updatedAt: Date.now(),
@@ -3743,6 +3833,7 @@ function openJob(id){
   restoreChecklist(j.checklistState);
   structures = (Array.isArray(j.structures) && j.structures.length) ? j.structures.slice() : ['Main Roof'];
   currentStructure = j.currentStructure && structures.indexOf(j.currentStructure) !== -1 ? j.currentStructure : structures[0];
+  structureMaterials = (j.structureMaterials && typeof j.structureMaterials === 'object') ? JSON.parse(JSON.stringify(j.structureMaterials)) : {};
   guidedData = j.guidedData && typeof j.guidedData === 'object' ? JSON.parse(JSON.stringify(j.guidedData)) : {};
   guidedMode = (j.guidedMode === undefined) ? true : !!j.guidedMode;
   currentStepIndex = 0;
@@ -4041,7 +4132,8 @@ function runReportGen(transcript, opts){
   }
   if(isGuidedInput){
     contextBlock += 'GUIDED INPUT NOTES:\n' +
-      'The transcript below came from a guided per-item inspection. It is organised by structure using "=== Structure Name ===" headers, with each inspection item labelled beneath (e.g. "Sheets:", "Flashings:", "Gutters & Downpipes:").\n' +
+      'The transcript below came from a guided per-item inspection. It is organised by structure using "=== Structure Name (Material) ===" headers where Material is Metal or Tile, with each inspection item labelled beneath (e.g. "Sheets:", "Tiles:", "Gutters & Downpipes:").\n' +
+      '- Structures may use different materials on the same job (for example a tile main roof with a metal carport awning). Describe each structure according to ITS OWN material - metal terms for a metal structure, tile terms for a tile structure. Do not describe a metal awning as if it were tile, or vice versa.\n' +
       '- Group findings BY STRUCTURE in the Findings section. When items relate to a non-main structure (e.g. Garage, Rear Carport, Shed), include the structure name in the Area column so it reads as separate rows (e.g. "Ridge Cap - Main Roof", "Sheets - Rear Carport Awning"). For items on the main structure only, structure name is optional.\n' +
       '- Information from any labelled item can flow into Findings, Event Damage, or Maintenance wherever it gives useful context - do not treat labels as rigid section mappings.\n' +
       '- Skipped items are omitted entirely from the transcript. Do NOT invent details for items that are not present.\n\n';
