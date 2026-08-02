@@ -5106,7 +5106,6 @@ async function uploadJobPackToDrive(opts){
     if(addr) folderName += ' — ' + addr;
   }
   var files = [];
-  var photoBytesTotal = 0;
   for(var i = 0; i < validPhotos.length; i++){
     if(opts.onPhotoProgress) opts.onPhotoProgress(i, validPhotos.length);
     try {
@@ -5115,27 +5114,20 @@ async function uploadJobPackToDrive(opts){
       if(seq.length < 2) seq = '0' + seq;
       var cap = sanitizeFileSegment(validPhotos[i].cap || validPhotos[i].caption);
       var name = seq + (cap ? ' — ' + cap : '') + '.jpg';
-      var bytes = Math.ceil(((data||'').length * 3) / 4);
-      photoBytesTotal += bytes;
-      console.log('[export-diag] photo ' + (i+1) + '/' + validPhotos.length + ' compressed base64=' + Math.round((data||'').length/1024) + 'KB (~' + Math.round(bytes/1024) + 'KB binary) src=' + Math.round((validPhotos[i].url||'').length/1024) + 'KB');
       files.push({ name: name, data: data, mimeType: 'image/jpeg' });
     } catch(e){
       console.error('[export] photo', i+1, 'compression failed:', e && e.message);
     }
   }
-  var pdfBytes = 0;
   if(pdfBlob){
     try {
       var pdfDataUrl = await blobToBase64(pdfBlob);
       var idx = pdfDataUrl.indexOf(',');
       if(idx >= 0) files.push({ name: 'Report.pdf', data: pdfDataUrl.slice(idx + 1), mimeType: 'application/pdf' });
-      pdfBytes = pdfBlob.size || 0;
-      console.log('[export-diag] Report.pdf attached size=' + Math.round(pdfBytes/1024) + 'KB (' + (pdfBytes/1048576).toFixed(2) + 'MB)');
     } catch(e){
       console.error('[export] PDF base64 failed:', e && e.message);
     }
   }
-  console.log('[export-diag] payload summary: ' + validPhotos.length + ' photos (~' + Math.round(photoBytesTotal/1024) + 'KB binary), pdf=' + Math.round(pdfBytes/1024) + 'KB, total ~' + ((photoBytesTotal + pdfBytes)/1048576).toFixed(2) + 'MB before base64 overhead');
   if(!files.length) return { error: 'no_files' };
   if(opts.onUploadStart) opts.onUploadStart();
   var sess = await supa.auth.getSession();
@@ -5426,18 +5418,14 @@ async function shrinkAllPhotosForPdf(photoArr){
     var ori = orientationOf(p);
     var target = PDF_PHOTO_TARGET[ori] || PDF_PHOTO_TARGET.landscape;
     var cacheKey = p.id ? (p.id + ':' + target.w + 'x' + target.h) : null;
-    var shrunk, fromCache = false;
+    var shrunk;
     if(cacheKey && pdfShrinkCache[cacheKey]){
       shrunk = pdfShrinkCache[cacheKey];
-      fromCache = true;
     } else {
       shrunk = await shrinkForPdf(p.url, target.w, target.h);
       if(cacheKey) pdfShrinkCache[cacheKey] = shrunk;
     }
-    var origLen = (p.url||'').length;
-    var newLen = (shrunk||'').length;
-    console.log('[pdf-diag] photo ' + (i+1) + '/' + photoArr.length + ' id=' + (p.id||'(none)') + ' ori=' + ori + ' target=' + target.w + 'x' + target.h + ' orig=' + Math.round(origLen/1024) + 'KB shrunk=' + Math.round(newLen/1024) + 'KB' + (fromCache?' (cache)':'') + (shrunk===p.url?' [!!shrink fell back to original]':''));
-    out.push(Object.assign({}, p, { url: shrunk, _origSize: origLen, _newSize: newLen }));
+    out.push(Object.assign({}, p, { url: shrunk, _origSize: (p.url||'').length, _newSize: (shrunk||'').length }));
     if((i + 1) % YIELD_EVERY === 0){
       await new Promise(function(r){ setTimeout(r, 0); });
     }
