@@ -5249,27 +5249,69 @@ function compressPhotoForPDF(photoUrl){
   });
 }
 
+var pdfShrinkCache = {};
+
+function shrinkForPdf(dataUrl){
+  return new Promise(function(resolve){
+    if(!dataUrl){ resolve(''); return; }
+    var img = new Image();
+    img.onload = function(){
+      var maxSide = 1000;
+      var w = img.width, h = img.height;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.max(1, Math.round(w * scale));
+      h = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      try {
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      } catch(e){ resolve(dataUrl); }
+    };
+    img.onerror = function(){ resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
+
+async function shrinkAllPhotosForPdf(photoArr){
+  var out = [];
+  var YIELD_EVERY = 3;
+  for(var i = 0; i < photoArr.length; i++){
+    var p = photoArr[i];
+    if(!p || !p.url){ out.push(p); continue; }
+    var cacheKey = p.id || null;
+    var shrunk;
+    if(cacheKey && pdfShrinkCache[cacheKey]){
+      shrunk = pdfShrinkCache[cacheKey];
+    } else {
+      shrunk = await shrinkForPdf(p.url);
+      if(cacheKey) pdfShrinkCache[cacheKey] = shrunk;
+    }
+    out.push(Object.assign({}, p, { url: shrunk, _origSize: (p.url||'').length, _newSize: (shrunk||'').length }));
+    if((i + 1) % YIELD_EVERY === 0){
+      await new Promise(function(r){ setTimeout(r, 0); });
+    }
+  }
+  return out;
+}
+
 async function buildReport(scope,findings,entry,causation,maint,recs,conclusion){
   if(Array.isArray(photos) && photos.length) await ensureCloudPhotosLoaded(photos);
   var rawPdfPhotos = (photos||[]).filter(function(p){ return p && p.url; });
-  console.log('[pdf] compressing', rawPdfPhotos.length, 'photos for PDF...');
+  console.log('[pdf] shrinking', rawPdfPhotos.length, 'photos for PDF embed...');
+  if(rawPdfPhotos.length > 4) setPill('gen-status','Preparing photos for PDF...','work');
   var t0 = Date.now();
-  Promise.all(rawPdfPhotos.map(function(p){
-    return compressPhotoForPDF(p.url).then(function(url){
-      var origSize = (p.url||'').length;
-      var newSize = (url||'').length;
-      return Object.assign({}, p, { url: url, _origSize: origSize, _newSize: newSize });
-    });
-  })).then(function(pdfPhotos){
+  try {
+    var pdfPhotos = await shrinkAllPhotosForPdf(rawPdfPhotos);
     var origTotal = pdfPhotos.reduce(function(s,p){ return s+(p._origSize||0); }, 0);
     var newTotal  = pdfPhotos.reduce(function(s,p){ return s+(p._newSize||0); }, 0);
-    console.log('[pdf] photo compression done in', (Date.now()-t0), 'ms - original ~', Math.round(origTotal/1024), 'KB, compressed ~', Math.round(newTotal/1024), 'KB');
+    console.log('[pdf] photo shrink done in', (Date.now()-t0), 'ms - source ~', Math.round(origTotal/1024), 'KB, embed ~', Math.round(newTotal/1024), 'KB');
     buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,pdfPhotos);
-  }).catch(function(e){
-    console.error('[pdf] photo compression failed:', e && e.message);
+  } catch(e){
+    console.error('[pdf] photo shrink failed:', e && e.message);
     setPill('gen-status','Error preparing photos: '+(e && e.message || e),'err');
     busy=false; document.getElementById('gen-btn').disabled=false;
-  });
+  }
 }
 
 function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,pdfPhotos){
