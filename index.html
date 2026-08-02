@@ -5561,7 +5561,9 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
         if(!ori && ph.width && ph.height){ ori = ph.width > ph.height ? 'landscape' : 'portrait'; }
         if(!ori) ori = 'landscape';
         var phClass = ori === 'portrait' ? 'ph-cell ph-portrait' : 'ph-cell ph-landscape';
-        rowHtml += '<div class="'+phClass+'"><img src="'+ph.url+'"><div class="ph-cap">Photo '+(pi+pj+1)+(ph.cap?' - '+esc(ph.cap):'')+'</div></div>';
+        var phW = 220;
+        var phH = ori === 'portrait' ? 200 : 150;
+        rowHtml += '<div class="'+phClass+'"><img src="'+ph.url+'" width="'+phW+'" height="'+phH+'" loading="eager" decoding="sync"><div class="ph-cap">Photo '+(pi+pj+1)+(ph.cap?' - '+esc(ph.cap):'')+'</div></div>';
       } else {
         rowHtml += '<div class="ph-cell"></div>';
       }
@@ -5679,9 +5681,10 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
 '.ph-row.ph-first{page-break-before:avoid;break-before:avoid}' +
 '.ph-row{align-items:flex-start}' +
 '.ph-cell{flex:0 0 33.333%;width:33.333%;padding:5px;box-sizing:border-box}' +
-'.ph-cell img{width:100%;border:1px solid #ddd;display:block;border-radius:2px;object-fit:cover}' +
+'.ph-cell img{width:100%;max-width:220px;border:1px solid #ddd;display:block;border-radius:2px;object-fit:cover;image-resolution:96dpi;image-rendering:auto}' +
 '.ph-cell.ph-landscape img{height:150px}' +
 '.ph-cell.ph-portrait img{height:200px}' +
+'@media print{.ph-cell img{image-resolution:96dpi}}' +
 '.ph-cap{font-size:9px;color:#888;font-style:italic;padding:3px 1px}' +
 '</style></head><body>' +
 
