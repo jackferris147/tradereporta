@@ -5376,20 +5376,33 @@ function compressPhotoForPDF(photoUrl){
 
 var pdfShrinkCache = {};
 
-function shrinkForPdf(dataUrl){
+var PDF_PHOTO_TARGET = {
+  landscape: { w: 440, h: 300 },
+  portrait:  { w: 440, h: 400 }
+};
+
+function shrinkForPdf(dataUrl, targetW, targetH){
   return new Promise(function(resolve){
     if(!dataUrl){ resolve(''); return; }
+    var tw = targetW || PDF_PHOTO_TARGET.landscape.w;
+    var th = targetH || PDF_PHOTO_TARGET.landscape.h;
     var img = new Image();
     img.onload = function(){
-      var maxSide = 1000;
-      var w = img.width, h = img.height;
-      var scale = Math.min(1, maxSide / Math.max(w, h));
-      w = Math.max(1, Math.round(w * scale));
-      h = Math.max(1, Math.round(h * scale));
+      var sw = img.width, sh = img.height;
+      if(!sw || !sh){ resolve(dataUrl); return; }
+      // cover-crop: scale source to fill target, centre-crop overflow.
+      var scale = Math.max(tw / sw, th / sh);
+      var cropW = tw / scale;
+      var cropH = th / scale;
+      var sx = Math.max(0, (sw - cropW) / 2);
+      var sy = Math.max(0, (sh - cropH) / 2);
       var canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
+      canvas.width = tw; canvas.height = th;
       try {
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        var ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, tw, th);
         resolve(canvas.toDataURL('image/jpeg', 0.72));
       } catch(e){ resolve(dataUrl); }
     };
@@ -5398,24 +5411,32 @@ function shrinkForPdf(dataUrl){
   });
 }
 
+function orientationOf(p){
+  var ori = p && p.orientation;
+  if(!ori && p && p.width && p.height){ ori = p.width > p.height ? 'landscape' : 'portrait'; }
+  return ori || 'landscape';
+}
+
 async function shrinkAllPhotosForPdf(photoArr){
   var out = [];
   var YIELD_EVERY = 3;
   for(var i = 0; i < photoArr.length; i++){
     var p = photoArr[i];
     if(!p || !p.url){ out.push(p); continue; }
-    var cacheKey = p.id || null;
+    var ori = orientationOf(p);
+    var target = PDF_PHOTO_TARGET[ori] || PDF_PHOTO_TARGET.landscape;
+    var cacheKey = p.id ? (p.id + ':' + target.w + 'x' + target.h) : null;
     var shrunk, fromCache = false;
     if(cacheKey && pdfShrinkCache[cacheKey]){
       shrunk = pdfShrinkCache[cacheKey];
       fromCache = true;
     } else {
-      shrunk = await shrinkForPdf(p.url);
+      shrunk = await shrinkForPdf(p.url, target.w, target.h);
       if(cacheKey) pdfShrinkCache[cacheKey] = shrunk;
     }
     var origLen = (p.url||'').length;
     var newLen = (shrunk||'').length;
-    console.log('[pdf-diag] photo ' + (i+1) + '/' + photoArr.length + ' id=' + (p.id||'(none)') + ' orig=' + Math.round(origLen/1024) + 'KB shrunk=' + Math.round(newLen/1024) + 'KB' + (fromCache?' (cache)':'') + (shrunk===p.url?' [!!shrink fell back to original]':''));
+    console.log('[pdf-diag] photo ' + (i+1) + '/' + photoArr.length + ' id=' + (p.id||'(none)') + ' ori=' + ori + ' target=' + target.w + 'x' + target.h + ' orig=' + Math.round(origLen/1024) + 'KB shrunk=' + Math.round(newLen/1024) + 'KB' + (fromCache?' (cache)':'') + (shrunk===p.url?' [!!shrink fell back to original]':''));
     out.push(Object.assign({}, p, { url: shrunk, _origSize: origLen, _newSize: newLen }));
     if((i + 1) % YIELD_EVERY === 0){
       await new Promise(function(r){ setTimeout(r, 0); });
