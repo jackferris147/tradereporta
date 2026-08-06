@@ -1625,12 +1625,24 @@ var guidedItems = {
     { key: 'roofarea', label: 'Roof Around Area of Concern', hint: 'Condition around the suspected entry' },
     { key: 'general', label: 'General Roof Condition', hint: 'Overall state of the roof' },
     { key: 'source', label: 'Source Confirmed', hint: 'Confirmed not assumed' }
+  ],
+  smallStructure: [
+    { key: 'pitch',     label: 'Pitch & Look',  hint: 'Roof pitch, what it looks like, profile/material' },
+    { key: 'condition', label: 'Condition',     hint: 'Overall condition — any wear, rust, damage, age' },
+    { key: 'event',     label: 'Event Damage',  hint: 'Storm/event damage if any — hail, impact, wind. Note if NOT event-related.' }
+  ],
+  shed: [
+    { key: 'material',     label: 'Material & Pitch', hint: 'Roof material, profile, pitch' },
+    { key: 'condition',    label: 'Condition',        hint: 'Overall condition — wear, rust, damage, age' },
+    { key: 'penetrations', label: 'Penetrations',     hint: 'Any vents, whirlybirds, flues — only if present' },
+    { key: 'event',        label: 'Event Damage',     hint: 'Storm/event damage if any — hail, impact, wind. Note if NOT event-related.' }
   ]
 };
 
 var structures = ['Main Roof'];
 var currentStructure = 'Main Roof';
 var structureMaterials = {};
+var structureTypes = {};
 var guidedMode = true;
 var guidedData = {};
 var currentStepIndex = 0;
@@ -1648,6 +1660,19 @@ function materialForStructure(name){
 }
 
 function materialLabel(mat){ return mat === 'tile' ? 'Tile' : 'Metal'; }
+
+function structureTypeOf(name){
+  var t = structureTypes && structureTypes[name];
+  if(t === 'main' || t === 'carport' || t === 'shed' || t === 'patio') return t;
+  return 'main';
+}
+
+function structureTypeLabel(t){
+  if(t === 'carport') return 'Carport';
+  if(t === 'shed') return 'Shed';
+  if(t === 'patio') return 'Patio';
+  return 'Main Roof';
+}
 
 function guidedToChecklistIds(guidedKey){
   var listKey = (typeof activeChecklistKey === 'function') ? activeChecklistKey() : 'metal';
@@ -1710,6 +1735,9 @@ function hasAnyGuidedTranscripts(){
 function itemsForStructure(name){
   if(jtype === 'leak') return guidedItems.leak;
   if(jtype === 'makesafe') return [];
+  var type = structureTypeOf(name);
+  if(type === 'carport' || type === 'patio') return guidedItems.smallStructure;
+  if(type === 'shed') return guidedItems.shed;
   return materialForStructure(name) === 'tile' ? guidedItems.tile : guidedItems.metal;
 }
 
@@ -1740,10 +1768,7 @@ function updateGuidedVerifySummary(){
 }
 
 function getActiveGuidedSet(){
-  if(jtype === 'leak') return guidedItems.leak;
-  if(jtype === 'makesafe') return [];
-  var mat = materialForStructure(currentStructure);
-  return mat === 'tile' ? guidedItems.tile : guidedItems.metal;
+  return itemsForStructure(currentStructure);
 }
 
 function rebuildStructureSelect(){
@@ -1800,6 +1825,7 @@ function removeStructure(){
   if(!confirm('Remove "' + name + '" and its guided recordings?')) return;
   if(guidedData[name]) delete guidedData[name];
   if(structureMaterials[name]) delete structureMaterials[name];
+  if(structureTypes[name]) delete structureTypes[name];
   structures = structures.filter(function(s){ return s !== name; });
   currentStructure = structures[0];
   currentStepIndex = 0;
@@ -1827,23 +1853,43 @@ function addStructure(){
   var name = prompt('Structure name (e.g. Garage, Carport, Shed):');
   if(!name || !name.trim()) return;
   name = name.trim();
-  if(structures.indexOf(name) === -1){
-    var mainMat = deriveMainMaterial();
-    var chosenMat = mainMat;
-    if(jtype === 'roof'){
+  if(structures.indexOf(name) !== -1){ showToast('Already added'); return; }
+
+  var chosenType = 'carport';
+  var chosenMat = 'metal';
+  if(jtype === 'roof'){
+    var typeMsg = 'Type for "' + name + '"?\n\n' +
+      '1 = Main Roof (full checklist)\n' +
+      '2 = Carport / Awning (quick 3 items)\n' +
+      '3 = Shed / Garage (4 items)\n' +
+      '4 = Patio (quick 3 items)\n\n' +
+      'Enter 1, 2, 3 or 4:';
+    var raw = prompt(typeMsg, '2');
+    if(raw === null) return;
+    var t = (raw || '').trim();
+    if(t === '1') chosenType = 'main';
+    else if(t === '3') chosenType = 'shed';
+    else if(t === '4') chosenType = 'patio';
+    else chosenType = 'carport';
+
+    if(chosenType === 'main'){
+      var mainMat = deriveMainMaterial();
       var otherMat = mainMat === 'tile' ? 'metal' : 'tile';
       var msg = 'What material is "' + name + '"?\n\nOK = ' + materialLabel(mainMat).toUpperCase() + ' (same as main roof)\nCancel = ' + materialLabel(otherMat).toUpperCase();
       chosenMat = confirm(msg) ? mainMat : otherMat;
-      structureMaterials[name] = chosenMat;
+    } else {
+      chosenMat = 'metal';
     }
-    structures.push(name);
-    rebuildStructureSelect();
-    currentStructure = name;
-    document.getElementById('current-structure').value = name;
-    currentStepIndex = 0;
-    updateStructureMaterialBtn();
-    renderGuidedStep();
+    structureMaterials[name] = chosenMat;
+    structureTypes[name] = chosenType;
   }
+  structures.push(name);
+  rebuildStructureSelect();
+  currentStructure = name;
+  document.getElementById('current-structure').value = name;
+  currentStepIndex = 0;
+  updateStructureMaterialBtn();
+  renderGuidedStep();
   markEdited();
   autoSaveJob();
 }
@@ -2241,11 +2287,10 @@ function buildGuidedTranscript(){
   if(jtype === 'makesafe') return '';
   var lines = [];
   structures.forEach(function(structure){
-    var mat = (jtype === 'leak') ? null : materialForStructure(structure);
-    var items;
-    if(jtype === 'leak') items = guidedItems.leak;
-    else items = (mat === 'tile') ? guidedItems.tile : guidedItems.metal;
+    var items = itemsForStructure(structure);
     if(!items || !items.length) return;
+    var mat = (jtype === 'leak') ? null : materialForStructure(structure);
+    var type = (jtype === 'leak') ? null : structureTypeOf(structure);
     var seen = {};
     var structureLines = [];
     items.forEach(function(item){
@@ -2259,8 +2304,8 @@ function buildGuidedTranscript(){
       if(x) content += (content ? ' ' : '') + x;
       structureLines.push(item.label + ': ' + content);
     });
-    // Recordings from a previous material assignment for this structure
-    // should still surface (kept by item key) - append at the end.
+    // Recordings from a previous material or type assignment for this
+    // structure should still surface (kept by item key) - append at the end.
     var extras = guidedData[structure] || {};
     Object.keys(extras).forEach(function(k){
       if(seen[k]) return;
@@ -2274,7 +2319,14 @@ function buildGuidedTranscript(){
       structureLines.push(k + ': ' + content);
     });
     if(structureLines.length){
-      var header = mat ? (structure + ' (' + materialLabel(mat) + ')') : structure;
+      var header;
+      if(!mat){
+        header = structure;
+      } else if(type && type !== 'main'){
+        header = structure + ' (' + structureTypeLabel(type) + ', ' + materialLabel(mat) + ')';
+      } else {
+        header = structure + ' (' + materialLabel(mat) + ')';
+      }
       lines.push('=== ' + header + ' ===');
       lines.push(structureLines.join('\n'));
     }
@@ -2309,6 +2361,7 @@ function resetGuidedState(){
   structures = ['Main Roof'];
   currentStructure = 'Main Roof';
   structureMaterials = {};
+  structureTypes = {};
   guidedData = {};
   currentStepIndex = 0;
   guidedMode = true;
@@ -3256,6 +3309,7 @@ function getJobData(){
     structures: (structures || []).slice(),
     currentStructure: currentStructure,
     structureMaterials: JSON.parse(JSON.stringify(structureMaterials || {})),
+    structureTypes: JSON.parse(JSON.stringify(structureTypes || {})),
     guidedMode: !!guidedMode,
     guidedData: JSON.parse(JSON.stringify(guidedData || {})),
     updatedAt: Date.now(),
@@ -3951,6 +4005,7 @@ function openJob(id){
   structures = (Array.isArray(j.structures) && j.structures.length) ? j.structures.slice() : ['Main Roof'];
   currentStructure = j.currentStructure && structures.indexOf(j.currentStructure) !== -1 ? j.currentStructure : structures[0];
   structureMaterials = (j.structureMaterials && typeof j.structureMaterials === 'object') ? JSON.parse(JSON.stringify(j.structureMaterials)) : {};
+  structureTypes = (j.structureTypes && typeof j.structureTypes === 'object') ? JSON.parse(JSON.stringify(j.structureTypes)) : {};
   guidedData = j.guidedData && typeof j.guidedData === 'object' ? JSON.parse(JSON.stringify(j.guidedData)) : {};
   guidedMode = (j.guidedMode === undefined) ? true : !!j.guidedMode;
   currentStepIndex = 0;
@@ -4249,8 +4304,9 @@ function runReportGen(transcript, opts){
   }
   if(isGuidedInput){
     contextBlock += 'GUIDED INPUT NOTES:\n' +
-      'The transcript below came from a guided per-item inspection. It is organised by structure using "=== Structure Name (Material) ===" headers where Material is Metal or Tile, with each inspection item labelled beneath (e.g. "Sheets:", "Tiles:", "Gutters & Downpipes:").\n' +
+      'The transcript below came from a guided per-item inspection. Structures are labelled as "=== Structure Name (Material) ===" for the main roof, or "=== Structure Name (Type, Material) ===" for secondary structures where Type is Carport, Shed or Patio. Each inspection item is labelled beneath (e.g. "Sheets:", "Tiles:", "Gutters & Downpipes:").\n' +
       '- Structures may use different materials on the same job (for example a tile main roof with a metal carport awning). Describe each structure according to ITS OWN material - metal terms for a metal structure, tile terms for a tile structure. Do not describe a metal awning as if it were tile, or vice versa.\n' +
+      '- Carport, Shed and Patio structures are small secondary structures. Cover them CONCISELY (typically 1-3 short findings each) - NOT the full section treatment the main roof gets. If an item on a secondary structure has nothing notable, it is fine to omit it.\n' +
       '- Group findings BY STRUCTURE in the Findings section. When items relate to a non-main structure (e.g. Garage, Rear Carport, Shed), include the structure name in the Area column so it reads as separate rows (e.g. "Ridge Cap - Main Roof", "Sheets - Rear Carport Awning"). For items on the main structure only, structure name is optional.\n' +
       '- Information from any labelled item can flow into Findings, Event Damage, or Maintenance wherever it gives useful context - do not treat labels as rigid section mappings.\n' +
       '- Skipped items are omitted entirely from the transcript. Do NOT invent details for items that are not present.\n\n';
