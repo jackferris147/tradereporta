@@ -586,6 +586,126 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
       </div>
     </div>
 
+    <div class="sec" id="sec-jobfacts">
+      <div class="sechdr" onclick="toggleSec('sec-jobfacts')">
+        <div class="sechdr-l">
+          <span class="sectitle">Job Facts</span>
+        </div>
+        <span class="secarr">&#8964;</span>
+      </div>
+      <div class="secbody" id="secbody-jobfacts">
+
+        <div class="pi-group"><div class="pi-label">Batten Type</div><div class="pi-options" data-jf="battenType">
+          <button type="button" class="pi-btn" data-val="timber" onclick="setJobFact('battenType','timber')">Timber</button>
+          <button type="button" class="pi-btn" data-val="metal" onclick="setJobFact('battenType','metal')">Metal</button>
+        </div></div>
+
+        <div class="pi-group">
+          <div class="pi-label">Batten Spacing (mm)</div>
+          <input type="number" id="jf-battenSpacingMm" min="0" step="10" placeholder="e.g. 450"
+            style="width:140px;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18"
+            oninput="setJobFactNumber('battenSpacingMm', this.value)">
+        </div>
+
+        <div class="pi-group"><div class="pi-label">Sarking Present</div><div class="pi-options" data-jf="sarkingPresent">
+          <button type="button" class="pi-btn" data-val="yes" onclick="setJobFact('sarkingPresent','yes')">Yes</button>
+          <button type="button" class="pi-btn" data-val="no" onclick="setJobFact('sarkingPresent','no')">No</button>
+        </div></div>
+
+        <div class="pi-group" id="jf-sarking-type-group" style="display:none"><div class="pi-label">Sarking Type</div><div class="pi-options" data-jf="sarkingType">
+          <button type="button" class="pi-btn" data-val="sisalation" onclick="setJobFact('sarkingType','sisalation')">Sisalation Foil</button>
+          <button type="button" class="pi-btn" data-val="anticon" onclick="setJobFact('sarkingType','anticon')">Anticon Blanket</button>
+          <button type="button" class="pi-btn" data-val="aircel" onclick="setJobFact('sarkingType','aircel')">Aircel</button>
+        </div></div>
+
+        <div class="pi-group"><div class="pi-label">Insulation Present</div><div class="pi-options" data-jf="insulationPresent">
+          <button type="button" class="pi-btn" data-val="yes" onclick="setJobFact('insulationPresent','yes')">Yes</button>
+          <button type="button" class="pi-btn" data-val="no" onclick="setJobFact('insulationPresent','no')">No</button>
+        </div></div>
+
+        <div class="pi-group">
+          <div class="pi-label">Gutter Type</div>
+          <input type="text" id="jf-gutterType" placeholder="e.g. 150mm quad Colorbond"
+            style="width:100%;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18"
+            oninput="setJobFactText('gutterType', this.value)">
+        </div>
+
+        <div class="pi-group">
+          <div class="pi-label">Downpipe Type</div>
+          <input type="text" id="jf-downpipeType" placeholder="e.g. 100mm round PVC"
+            style="width:100%;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18"
+            oninput="setJobFactText('downpipeType', this.value)">
+        </div>
+
+        <div class="pi-group">
+          <div class="pi-label">Penetrations (count)</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+            <label style="display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6B7280">Whirlybirds
+              <input type="number" id="jf-pen-whirlybirds" min="0" step="1" style="width:64px;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:6px;padding:6px 10px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18" oninput="setJobFactPen('whirlybirds', this.value)">
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6B7280">Vent Pipes
+              <input type="number" id="jf-pen-ventPipes" min="0" step="1" style="width:64px;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:6px;padding:6px 10px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18" oninput="setJobFactPen('ventPipes', this.value)">
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6B7280">Skylights
+              <input type="number" id="jf-pen-skylights" min="0" step="1" style="width:64px;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:6px;padding:6px 10px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18" oninput="setJobFactPen('skylights', this.value)">
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6B7280">Antennae
+              <input type="number" id="jf-pen-antennae" min="0" step="1" style="width:64px;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:6px;padding:6px 10px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18" oninput="setJobFactPen('antennae', this.value)">
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6B7280">Chimneys
+              <input type="number" id="jf-pen-chimneys" min="0" step="1" style="width:64px;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:6px;padding:6px 10px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18" oninput="setJobFactPen('chimneys', this.value)">
+            </label>
+          </div>
+        </div>
+
+        <div class="pi-group" id="jf-entry-group" style="display:none"><div class="pi-label">Point of Water Entry (pick all that apply)</div><div class="pi-options" data-jf-multi="entryPoints">
+          <button type="button" class="pi-btn" data-val="flashing" onclick="toggleJobFactMulti('entryPoints','flashing')">Via flashing</button>
+          <button type="button" class="pi-btn" data-val="sheet-laps" onclick="toggleJobFactMulti('entryPoints','sheet-laps')">Via sheet laps</button>
+          <button type="button" class="pi-btn" data-val="valleys" onclick="toggleJobFactMulti('entryPoints','valleys')">Via valleys</button>
+          <button type="button" class="pi-btn" data-val="cracked-bedding" onclick="toggleJobFactMulti('entryPoints','cracked-bedding')">Via cracked ridge/hip bedding</button>
+          <button type="button" class="pi-btn" data-val="tiles-no-sarking" onclick="toggleJobFactMulti('entryPoints','tiles-no-sarking')">Via tiles with no sarking</button>
+          <button type="button" class="pi-btn" data-val="overflow-gutter" onclick="toggleJobFactMulti('entryPoints','overflow-gutter')">Via overflowing gutter</button>
+          <button type="button" class="pi-btn" data-val="overflow-valley" onclick="toggleJobFactMulti('entryPoints','overflow-valley')">Via overflowing valleys</button>
+          <button type="button" class="pi-btn" data-val="cracked-tiles" onclick="toggleJobFactMulti('entryPoints','cracked-tiles')">Via cracked tiles</button>
+          <button type="button" class="pi-btn" data-val="na" onclick="toggleJobFactMulti('entryPoints','na')">N/A</button>
+        </div></div>
+
+        <div class="pi-group"><div class="pi-label">Owner-Maintenance Defects (pick all that apply)</div><div class="pi-options" data-jf-multi="ownerDefects">
+          <button type="button" class="pi-btn" data-val="rust-fixings" onclick="toggleJobFactMulti('ownerDefects','rust-fixings')">Rusting screws/nails/fixings</button>
+          <button type="button" class="pi-btn" data-val="rust-sheets" onclick="toggleJobFactMulti('ownerDefects','rust-sheets')">Rusting sheets</button>
+          <button type="button" class="pi-btn" data-val="rust-flashings" onclick="toggleJobFactMulti('ownerDefects','rust-flashings')">Rusting flashings</button>
+          <button type="button" class="pi-btn" data-val="debris-gutters" onclick="toggleJobFactMulti('ownerDefects','debris-gutters')">Gutters with debris</button>
+          <button type="button" class="pi-btn" data-val="debris-valleys" onclick="toggleJobFactMulti('ownerDefects','debris-valleys')">Valleys with debris</button>
+          <button type="button" class="pi-btn" data-val="poor-workmanship" onclick="toggleJobFactMulti('ownerDefects','poor-workmanship')">Poor workmanship</button>
+          <button type="button" class="pi-btn" data-val="below-code-pitch" onclick="toggleJobFactMulti('ownerDefects','below-code-pitch')">Below-code pitch</button>
+          <button type="button" class="pi-btn" data-val="nil" onclick="toggleJobFactMulti('ownerDefects','nil')">NIL</button>
+        </div></div>
+
+        <div class="pi-group"><div class="pi-label">Asbestos Suspected</div><div class="pi-options" data-jf="asbestos">
+          <button type="button" class="pi-btn" data-val="yes" onclick="setJobFact('asbestos','yes')">Yes</button>
+          <button type="button" class="pi-btn" data-val="no" onclick="setJobFact('asbestos','no')">No</button>
+        </div></div>
+
+        <div class="pi-group"><div class="pi-label">Height Safety / Safety Rails Required</div><div class="pi-options" data-jf="heightSafety">
+          <button type="button" class="pi-btn" data-val="yes" onclick="setJobFact('heightSafety','yes')">Yes</button>
+          <button type="button" class="pi-btn" data-val="no" onclick="setJobFact('heightSafety','no')">No</button>
+        </div></div>
+
+        <div class="pi-group" id="jf-height-detail-group" style="display:none">
+          <div class="pi-label">What Safety (optional)</div>
+          <input type="text" id="jf-heightSafetyDetail" placeholder="e.g. Harness anchor points, edge protection"
+            style="width:100%;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;font-family:'Barlow',sans-serif;font-size:14px;color:#1C1A18"
+            oninput="setJobFactText('heightSafetyDetail', this.value)">
+        </div>
+
+        <div class="pi-group"><div class="pi-label">Electrical Hazards Present</div><div class="pi-options" data-jf="electricalHazards">
+          <button type="button" class="pi-btn" data-val="yes" onclick="setJobFact('electricalHazards','yes')">Yes</button>
+          <button type="button" class="pi-btn" data-val="no" onclick="setJobFact('electricalHazards','no')">No</button>
+        </div></div>
+
+      </div>
+    </div>
+
     <div class="sec" id="sec-guided">
       <div class="sechdr" onclick="toggleSec('sec-guided')">
         <div class="sechdr-l">
@@ -1620,6 +1740,7 @@ function goView(v){
 function toggleSec(id){ document.getElementById(id).classList.toggle('shut'); }
 
 var preInspectData = {};
+var jobFacts = {};
 var checklistState = { metal: {}, tile: {}, leak: {}, activeTab: 'metal' };
 
 var guidedItems = {
@@ -2695,6 +2816,226 @@ function preInspectLabel(key, val){
   return map[val] || val;
 }
 
+var JOB_FACTS_LABELS = {
+  battenType: { timber:'Timber', metal:'Metal' },
+  sarkingPresent: { yes:'Yes', no:'No' },
+  sarkingType: { sisalation:'Sisalation Foil', anticon:'Anticon Blanket', aircel:'Aircel' },
+  insulationPresent: { yes:'Yes', no:'No' },
+  asbestos: { yes:'Yes', no:'No' },
+  heightSafety: { yes:'Yes', no:'No' },
+  electricalHazards: { yes:'Yes', no:'No' },
+  entryPoints: {
+    'flashing':'Via flashing',
+    'sheet-laps':'Via sheet laps',
+    'valleys':'Via valleys',
+    'cracked-bedding':'Via cracked ridge or hip bedding',
+    'tiles-no-sarking':'Via tiles with no sarking',
+    'overflow-gutter':'Via overflowing gutter',
+    'overflow-valley':'Via overflowing valleys',
+    'cracked-tiles':'Via cracked tiles',
+    'na':'N/A'
+  },
+  ownerDefects: {
+    'rust-fixings':'Rusting screws/nails/fixings',
+    'rust-sheets':'Rusting sheets',
+    'rust-flashings':'Rusting flashings',
+    'debris-gutters':'Gutters with debris',
+    'debris-valleys':'Valleys with debris',
+    'poor-workmanship':'Poor workmanship',
+    'below-code-pitch':'Below-code pitch',
+    'nil':'NIL'
+  }
+};
+var PEN_LABELS = { whirlybirds:'whirlybirds', ventPipes:'vent pipes', skylights:'skylights', antennae:'antennae', chimneys:'chimneys' };
+
+function jobFactLabel(key, val){
+  var map = JOB_FACTS_LABELS[key] || {};
+  return map[val] || val;
+}
+
+function setJobFact(key, val){
+  if(!jobFacts) jobFacts = {};
+  if(jobFacts[key] === val){
+    jobFacts[key] = '';
+  } else {
+    jobFacts[key] = val;
+  }
+  renderJobFactsUI();
+  if(key === 'sarkingPresent') updateJobFactsConditionals();
+  if(key === 'heightSafety') updateJobFactsConditionals();
+  markEdited();
+  autoSaveJob();
+}
+
+function setJobFactText(key, val){
+  if(!jobFacts) jobFacts = {};
+  jobFacts[key] = (val == null) ? '' : String(val);
+  markEdited();
+  autoSaveJob();
+}
+
+function setJobFactNumber(key, val){
+  if(!jobFacts) jobFacts = {};
+  var n = parseFloat(val);
+  jobFacts[key] = isNaN(n) ? '' : n;
+  markEdited();
+  autoSaveJob();
+}
+
+function setJobFactPen(kind, val){
+  if(!jobFacts) jobFacts = {};
+  if(!jobFacts.pens || typeof jobFacts.pens !== 'object') jobFacts.pens = {};
+  var n = parseInt(val, 10);
+  jobFacts.pens[kind] = (isNaN(n) || n < 0) ? 0 : n;
+  markEdited();
+  autoSaveJob();
+}
+
+function toggleJobFactMulti(key, val){
+  if(!jobFacts) jobFacts = {};
+  var arr = Array.isArray(jobFacts[key]) ? jobFacts[key].slice() : [];
+  if(val === 'nil' || val === 'na'){
+    arr = (arr.indexOf(val) !== -1) ? [] : [val];
+  } else {
+    arr = arr.filter(function(x){ return x !== 'nil' && x !== 'na'; });
+    var idx = arr.indexOf(val);
+    if(idx === -1) arr.push(val); else arr.splice(idx, 1);
+  }
+  jobFacts[key] = arr;
+  renderJobFactsUI();
+  markEdited();
+  autoSaveJob();
+}
+
+function renderJobFactsUI(){
+  var host = document.getElementById('secbody-jobfacts');
+  if(!host) return;
+  ['battenType','sarkingPresent','sarkingType','insulationPresent','asbestos','heightSafety','electricalHazards'].forEach(function(key){
+    var row = host.querySelector('[data-jf="'+key+'"]');
+    if(!row) return;
+    var cur = jobFacts && jobFacts[key];
+    row.querySelectorAll('.pi-btn').forEach(function(btn){
+      btn.classList.toggle('selected', btn.dataset.val === cur);
+    });
+  });
+  ['entryPoints','ownerDefects'].forEach(function(key){
+    var row = host.querySelector('[data-jf-multi="'+key+'"]');
+    if(!row) return;
+    var arr = Array.isArray(jobFacts && jobFacts[key]) ? jobFacts[key] : [];
+    row.querySelectorAll('.pi-btn').forEach(function(btn){
+      btn.classList.toggle('selected', arr.indexOf(btn.dataset.val) !== -1);
+    });
+  });
+  var span = document.getElementById('jf-battenSpacingMm');
+  if(span) span.value = (jobFacts && jobFacts.battenSpacingMm != null && jobFacts.battenSpacingMm !== '') ? jobFacts.battenSpacingMm : '';
+  var gt = document.getElementById('jf-gutterType');
+  if(gt) gt.value = (jobFacts && jobFacts.gutterType) || '';
+  var dp = document.getElementById('jf-downpipeType');
+  if(dp) dp.value = (jobFacts && jobFacts.downpipeType) || '';
+  var hsd = document.getElementById('jf-heightSafetyDetail');
+  if(hsd) hsd.value = (jobFacts && jobFacts.heightSafetyDetail) || '';
+  Object.keys(PEN_LABELS).forEach(function(k){
+    var el = document.getElementById('jf-pen-'+k);
+    if(!el) return;
+    var v = jobFacts && jobFacts.pens && jobFacts.pens[k];
+    el.value = (v == null || v === 0 || v === '') ? '' : v;
+  });
+  updateJobFactsConditionals();
+}
+
+function updateJobFactsConditionals(){
+  var sarkRow = document.getElementById('jf-sarking-type-group');
+  if(sarkRow) sarkRow.style.display = (jobFacts && jobFacts.sarkingPresent === 'yes') ? '' : 'none';
+  var hsRow = document.getElementById('jf-height-detail-group');
+  if(hsRow) hsRow.style.display = (jobFacts && jobFacts.heightSafety === 'yes') ? '' : 'none';
+  var entryRow = document.getElementById('jf-entry-group');
+  if(entryRow) entryRow.style.display = (jtype === 'leak') ? '' : 'none';
+}
+
+function updateJobFactsVisibility(){
+  var sec = document.getElementById('sec-jobfacts');
+  if(!sec) return;
+  sec.style.display = (jtype === 'makesafe') ? 'none' : '';
+  updateJobFactsConditionals();
+}
+
+function restoreJobFacts(data){
+  jobFacts = (data && typeof data === 'object') ? JSON.parse(JSON.stringify(data)) : {};
+  if(jtype !== 'leak' && Array.isArray(jobFacts.entryPoints)) jobFacts.entryPoints = [];
+  renderJobFactsUI();
+  updateJobFactsVisibility();
+}
+
+function jobFactsHasAny(){
+  if(!jobFacts || typeof jobFacts !== 'object') return false;
+  var strKeys = ['battenType','sarkingPresent','sarkingType','insulationPresent','gutterType','downpipeType','asbestos','heightSafety','heightSafetyDetail','electricalHazards'];
+  for(var i = 0; i < strKeys.length; i++){
+    var v = jobFacts[strKeys[i]];
+    if(v != null && String(v).trim() !== '') return true;
+  }
+  if(jobFacts.battenSpacingMm != null && jobFacts.battenSpacingMm !== '' && !isNaN(parseFloat(jobFacts.battenSpacingMm))) return true;
+  if(Array.isArray(jobFacts.entryPoints) && jobFacts.entryPoints.length) return true;
+  if(Array.isArray(jobFacts.ownerDefects) && jobFacts.ownerDefects.length) return true;
+  if(jobFacts.pens && typeof jobFacts.pens === 'object'){
+    var pkeys = Object.keys(PEN_LABELS);
+    for(var j = 0; j < pkeys.length; j++){
+      var pv = jobFacts.pens[pkeys[j]];
+      if(pv && parseInt(pv, 10) > 0) return true;
+    }
+  }
+  return false;
+}
+
+function buildJobFactsPairs(source, jobType){
+  var d = source || {};
+  var isLeakJob = jobType === 'leak';
+  var pairs = [];
+  function push(label, value){
+    if(value == null || value === '' || value === false) return;
+    pairs.push({ label: label, value: String(value) });
+  }
+  if(d.battenType) push('Battens', jobFactLabel('battenType', d.battenType) + (d.battenSpacingMm ? ' @ ' + d.battenSpacingMm + 'mm' : ''));
+  else if(d.battenSpacingMm) push('Batten Spacing', d.battenSpacingMm + 'mm');
+  if(d.sarkingPresent === 'yes'){
+    push('Sarking', d.sarkingType ? jobFactLabel('sarkingType', d.sarkingType) : 'Present');
+  } else if(d.sarkingPresent === 'no'){
+    push('Sarking', 'None');
+  }
+  if(d.insulationPresent === 'yes') push('Insulation', 'Present');
+  else if(d.insulationPresent === 'no') push('Insulation', 'None');
+  if(d.gutterType) push('Gutters', d.gutterType);
+  if(d.downpipeType) push('Downpipes', d.downpipeType);
+  if(d.pens && typeof d.pens === 'object'){
+    var penParts = [];
+    Object.keys(PEN_LABELS).forEach(function(k){
+      var v = parseInt(d.pens[k], 10);
+      if(v > 0) penParts.push(v + ' ' + PEN_LABELS[k]);
+    });
+    if(penParts.length) push('Penetrations', penParts.join(', '));
+  }
+  if(isLeakJob && Array.isArray(d.entryPoints) && d.entryPoints.length){
+    push('Point of Water Entry', d.entryPoints.map(function(v){ return jobFactLabel('entryPoints', v); }).join(', '));
+  }
+  if(Array.isArray(d.ownerDefects) && d.ownerDefects.length){
+    push('Owner-Maintenance Defects', d.ownerDefects.map(function(v){ return jobFactLabel('ownerDefects', v); }).join(', '));
+  }
+  if(d.asbestos === 'yes') push('Asbestos', 'Suspected — testing required');
+  if(d.heightSafety === 'yes'){
+    push('Height Safety', d.heightSafetyDetail ? ('Required — ' + d.heightSafetyDetail) : 'Required');
+  }
+  if(d.electricalHazards === 'yes') push('Electrical Hazards', 'Present');
+  return pairs;
+}
+
+function buildJobFactsContext(){
+  if(!jobFactsHasAny()) return '';
+  var pairs = buildJobFactsPairs(jobFacts, jtype);
+  if(!pairs.length) return '';
+  var lines = ['JOB FACTS:'];
+  pairs.forEach(function(p){ lines.push('- ' + p.label + ': ' + p.value); });
+  return lines.join('\n');
+}
+
 function buildRoofDetailsPairs(source){
   var d = source || preInspectData || {};
   var order = [
@@ -2949,6 +3290,7 @@ function setType(t){
   if(typeof updateChecklistVisibility === 'function') updateChecklistVisibility();
   if(typeof updateGuidedVisibility === 'function') updateGuidedVisibility();
   if(typeof updateLeakFactsVisibility === 'function') updateLeakFactsVisibility();
+  if(typeof updateJobFactsVisibility === 'function') updateJobFactsVisibility();
   if(typeof renderGuidedStep === 'function') renderGuidedStep();
 }
 
@@ -3447,6 +3789,7 @@ function getJobData(){
     aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion'),
     eventRelated: !!eventRelated,
     preInspectData: JSON.parse(JSON.stringify(preInspectData || {})),
+    jobFacts: JSON.parse(JSON.stringify(jobFacts || {})),
     checklistState: JSON.parse(JSON.stringify(checklistState || { metal:{}, tile:{}, leak:{}, activeTab:'metal' })),
     structures: (structures || []).slice(),
     currentStructure: currentStructure,
@@ -3842,6 +4185,7 @@ function clearForm(){
   audioBlob = null;
   photos = [];
   restorePreInspect(null);
+  restoreJobFacts(null);
   restoreChecklist(null);
   resetGuidedState();
   initGuidedForJob();
@@ -4144,6 +4488,7 @@ function openJob(id){
   }
   updateRewriteVisibility();
   restorePreInspect(j.preInspectData);
+  restoreJobFacts(j.jobFacts);
   restoreChecklist(j.checklistState);
   structures = (Array.isArray(j.structures) && j.structures.length) ? j.structures.slice() : ['Main Roof'];
   currentStructure = j.currentStructure && structures.indexOf(j.currentStructure) !== -1 ? j.currentStructure : structures[0];
@@ -4440,9 +4785,13 @@ function runReportGen(transcript, opts){
   var systemPrompt = buildReportSystemPrompt(jtype, eventRelated, brandCompany);
   var preCtx = (typeof buildPreInspectContext === 'function') ? buildPreInspectContext() : '';
   var clCtx = (typeof buildChecklistContext === 'function') ? buildChecklistContext() : '';
+  var jfCtx = (typeof buildJobFactsContext === 'function' && jtype !== 'makesafe') ? buildJobFactsContext() : '';
   var contextBlock = '';
   if(preCtx){
     contextBlock += 'Use these pre-inspection details to accurately describe the roof in your report. These are confirmed on-site observations.\n\n' + preCtx + '\n\n';
+  }
+  if(jfCtx){
+    contextBlock += 'Use these confirmed job facts where relevant in findings, causation and recommendations. They are also rendered directly in the report as a facts block, so you do not need to restate them verbatim - reference them for context.\n\n' + jfCtx + '\n\n';
   }
   if(clCtx){
     contextBlock += 'The following checklist items were confirmed inspected on site. Only describe these items in the report; do NOT fabricate details about items that were not inspected.\n\n' + clCtx + '\n\n';
@@ -5740,6 +6089,19 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
     }
   }
 
+  var jobFactsH = '';
+  if(!isMakeSafe){
+    var jfPairs = (typeof buildJobFactsPairs === 'function') ? buildJobFactsPairs(f.jobFacts || {}, f.type) : [];
+    if(jfPairs.length){
+      var jfOdd = true;
+      var jfRows = jfPairs.map(function(p){
+        var bg = jfOdd?'#fff':'#f5f5f5'; jfOdd = !jfOdd;
+        return '<tr style="background:'+bg+'"><td style="padding:6px 12px;border:1px solid #ddd;font-size:11px;color:#888;font-weight:600;width:160px">'+esc(p.label)+'</td><td style="padding:6px 12px;border:1px solid #ddd;font-size:12px;color:#222">'+esc(p.value)+'</td></tr>';
+      }).join('');
+      jobFactsH = '<div class="secwrap"><div class="sh">Site &amp; Assessment</div><table><tbody>'+jfRows+'</tbody></table></div>';
+    }
+  }
+
   var findLines = (findings||'').split('\n').filter(function(r){ return r.trim(); });
   var findRows = findLines.map(function(line,fi){
     var first = line.indexOf('|');
@@ -5947,6 +6309,8 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   roofDetailsH +
 
   leakFactsH +
+
+  jobFactsH +
 
   '<div class="sh">Scope of Works</div>' +
   '<div class="bx">'+esc(scope||('As requested, '+brand.company+' attended site to '+(isMakeSafe?'carry out emergency make safe works.':'carry out a comprehensive inspection.')))+'</div>' +
