@@ -843,6 +843,7 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
         <div class="fld" style="margin-bottom:12px"><label>Findings (Area | Observation | Photos &mdash; one per line)</label><textarea id="ai-findings" style="min-height:130px;background:#F7F5F2;border:1px solid #E2DDD8;border-radius:6px;color:#1C1A18;font-family:'Barlow',sans-serif;font-size:14px;padding:9px 12px;width:100%;resize:vertical;line-height:1.5;outline:none"></textarea></div>
         <div class="fld" id="ai-entry-wrap" style="margin-bottom:12px;display:none"><label>Point of Water Entry</label><textarea id="ai-entry"></textarea></div>
         <div class="fld" id="ai-event-damage-wrap" style="margin-bottom:12px;display:none"><label>Event Damage</label><textarea id="ai-event-damage" class="lg" placeholder="Storm, hail or impact damage found during inspection..."></textarea></div>
+        <div class="fld" id="ai-additional-wrap" style="margin-bottom:12px;display:none"><label>Additional Structures</label><textarea id="ai-additional" class="lg" placeholder="[STRUCTURE name=&quot;...&quot;]...[/STRUCTURE] blocks — auto-populated by report generation."></textarea></div>
         <div class="fld" id="ai-works-wrap" style="margin-bottom:12px;display:none"><label>Works Carried Out</label><textarea id="ai-works" class="lg" placeholder="Temporary/emergency works performed &mdash; tarping, securing sheets, temporary flashing..."></textarea></div>
         <div class="fld" id="ai-maint-wrap" style="margin-bottom:12px"><label>Maintenance Items</label><textarea id="ai-maint" placeholder="Maintenance items found on site..."></textarea></div>
         <div class="fld" id="ai-causation-wrap" style="margin-bottom:12px"><label>Causation</label><textarea id="ai-causation" class="lg"></textarea></div>
@@ -1062,6 +1063,13 @@ function buildReportSystemPrompt(jt, evt, brandCompany){
   lines.push("Maintenance: 1-2 sentences describing planned maintenance work, or Nil");
   lines.push("Monitor: 1-2 sentences describing what to monitor after repairs, or Nil");
   lines.push("[CONCLUSION] one paragraph starting with '" + C + " has...'");
+  lines.push("");
+  lines.push("ADDITIONAL STRUCTURES");
+  lines.push("The tags above cover the MAIN roof. If the transcript contains any secondary structures marked with a Type of Carport, Shed or Patio (headers like \"=== Rear Carport (Carport, Metal) ===\"), emit ONE additional block per such structure AFTER [CONCLUSION], in the order they appear in the transcript, using this exact format:");
+  lines.push("[STRUCTURE name=\"Rear Carport\"]");
+  lines.push("One or two short paragraphs total. Cover material and pitch, condition, and event damage if any. This is a concise self-contained block, NOT the full section treatment given to the main roof. If nothing notable, one short paragraph is fine.");
+  lines.push("[/STRUCTURE]");
+  lines.push("Use the structure's actual name in the name attribute (the text between === and its type label in the transcript header). Do NOT emit a [STRUCTURE] block for the main roof - its content belongs in the main tags above. If there are no secondary structures, do not emit any [STRUCTURE] blocks.");
   return lines.join("\n");
 }
 
@@ -3284,6 +3292,7 @@ function setType(t){
   showField('ai-limitations-wrap', isMakeSafe);
   showField('ai-maint-wrap', !isMakeSafe);
   showField('ai-recs-wrap', !isMakeSafe);
+  showField('ai-additional-wrap', !isMakeSafe);
   var checklistSec = document.getElementById('sec-checklist');
   if(checklistSec) checklistSec.style.display = isMakeSafe ? 'none' : '';
   updateEventDamageVisibility();
@@ -3785,6 +3794,7 @@ function getJobData(){
     aiScope:g('ai-scope'), aiFindings:g('ai-findings'), aiEntry:g('ai-entry'),
     aiCausation:g('ai-causation'), aiMaint:g('ai-maint'),
     aiEventDamage:g('ai-event-damage'),
+    aiAdditional:g('ai-additional'),
     aiIssue:g('ai-issue'), aiWorks:g('ai-works'), aiLimitations:g('ai-limitations'),
     aiRecs:g('ai-recs'), aiConclusion:g('ai-conclusion'),
     eventRelated: !!eventRelated,
@@ -4160,7 +4170,7 @@ function populateJobCardPhotoCounts(){
 function clearForm(){
   var flds = ['client','ref','cm','cmemail','insurer','insurerref','customer','custphone','address','inspector','weather','roofmat','notes'];
   flds.forEach(function(f){ sv('f-'+f,''); });
-  var ais = ['scope','findings','entry','event-damage','issue','works','limitations','causation','maint','recs','conclusion'];
+  var ais = ['scope','findings','entry','event-damage','additional','issue','works','limitations','causation','maint','recs','conclusion'];
   ais.forEach(function(f){ sv('ai-'+f,''); });
   eventRelated = false;
   var evChk = document.getElementById('event-related');
@@ -4473,6 +4483,7 @@ function openJob(id){
   sv('ai-scope',j.aiScope); sv('ai-findings',j.aiFindings); sv('ai-entry',j.aiEntry);
   sv('ai-causation',j.aiCausation);
   sv('ai-event-damage', j.aiEventDamage || '');
+  sv('ai-additional', j.aiAdditional || '');
   sv('ai-issue', j.aiIssue || '');
   sv('ai-works', j.aiWorks || '');
   sv('ai-limitations', j.aiLimitations || '');
@@ -4831,6 +4842,18 @@ function runReportGen(transcript, opts){
     sv('ai-limitations', ex('LIMITATIONS'));
     sv('ai-maint',ex('MAINTENANCE'));
     sv('ai-recs',ex('RECOMMENDATIONS')); sv('ai-conclusion',ex('CONCLUSION'));
+    (function(){
+      var structRe = /\[STRUCTURE\s+name="([^"]*)"\]([\s\S]*?)\[\/STRUCTURE\]/g;
+      var addl = [];
+      var sm;
+      while((sm = structRe.exec(text))){
+        var name = (sm[1] || '').trim();
+        var body = (sm[2] || '').trim();
+        if(!name || !body) continue;
+        addl.push('[STRUCTURE name="' + name + '"]\n' + body + '\n[/STRUCTURE]');
+      }
+      sv('ai-additional', addl.join('\n\n'));
+    })();
     document.getElementById('sec-expanded').classList.add('on');
     document.getElementById('sec-expanded').style.display = 'block';
     setPill('expand-status','Report sections written - review below','done');
@@ -4933,6 +4956,8 @@ function applyEdit(){
   var currentBlock = order.map(function(tag){
     return '['+tag+']\n' + (g(fieldMap[tag]) || '');
   }).join('\n\n');
+  var currentAdditional = (jtype !== 'makesafe') ? (g('ai-additional') || '').trim() : '';
+  if(currentAdditional) currentBlock += '\n\n' + currentAdditional;
   var userMsg = 'Current sections:\n\n' + currentBlock + '\n\nEdit instruction: ' + instr;
   setPill('edit-status','Applying edit...','work');
   document.getElementById('edit-apply-btn').disabled = true;
@@ -4962,6 +4987,24 @@ function applyEdit(){
         changes++;
       }
     });
+    if(jtype !== 'makesafe'){
+      var structRe = /\[STRUCTURE\s+name="([^"]*)"\]([\s\S]*?)\[\/STRUCTURE\]/g;
+      var updated = [];
+      var sm;
+      while((sm = structRe.exec(text))){
+        var name = (sm[1] || '').trim();
+        var body = (sm[2] || '').trim();
+        if(!name || !body) continue;
+        updated.push('[STRUCTURE name="' + name + '"]\n' + body + '\n[/STRUCTURE]');
+      }
+      if(updated.length){
+        var newAdditional = updated.join('\n\n');
+        if(g('ai-additional') !== newAdditional){
+          sv('ai-additional', newAdditional);
+          changes++;
+        }
+      }
+    }
     setPill('edit-status', changes ? ('Updated '+changes+' section'+(changes>1?'s':'')) : 'No changes', changes ? 'done' : '');
     document.getElementById('edit-text').value = '';
     autoSaveJob();
@@ -5123,7 +5166,25 @@ function previewSections(){
   }
   arr.push({ key:'ai-recs',      label:'Recommendations',   type:'recs' });
   arr.push({ key:'ai-conclusion',label:'Conclusion',        type:'text' });
+  var addl = parseAdditionalStructures(g('ai-additional') || '');
+  addl.forEach(function(s, i){
+    arr.push({ key:'ai-additional-'+i, label:s.name, type:'additional-structure', content:s.content });
+  });
   return arr;
+}
+
+function parseAdditionalStructures(text){
+  var out = [];
+  if(!text) return out;
+  var re = /\[STRUCTURE\s+name="([^"]*)"\]([\s\S]*?)\[\/STRUCTURE\]/g;
+  var m;
+  while((m = re.exec(text))){
+    var name = (m[1] || '').trim();
+    var content = (m[2] || '').trim();
+    if(!name || !content) continue;
+    out.push({ name: name, content: content });
+  }
+  return out;
 }
 
 function parseMaintenanceSubHeadings(text){
@@ -5213,7 +5274,7 @@ function renderRecsTable(text){
 }
 
 function renderPreviewSection(sec){
-  var isReadOnly = sec.type === 'roofdetails';
+  var isReadOnly = sec.type === 'roofdetails' || sec.type === 'additional-structure';
   var value = isReadOnly ? '' : (g(sec.key) || '');
   var isEditing = previewEditingField === sec.key;
   var html = '<div class="preview-section'+(isEditing?' editing':'')+(isReadOnly?' readonly':'')+'" data-field="'+sec.key+'"';
@@ -5231,6 +5292,9 @@ function renderPreviewSection(sec){
       return '<tr><td class="preview-area">'+esc(p.label)+'</td><td>'+esc(p.value)+'</td></tr>';
     }).join('');
     html += '<table class="preview-table"><tbody>'+rows+'</tbody></table>';
+  } else if(sec.type === 'additional-structure'){
+    var body = (sec.content || '').trim();
+    html += '<div class="preview-body'+(body?'':' empty')+'">'+(body ? esc(body) : '(empty)')+'</div>';
   } else if(sec.type === 'findings'){
     html += renderFindingsTable(value);
   } else if(sec.type === 'recs'){
@@ -6216,6 +6280,16 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   var msWorksH = (isMakeSafe && msWorks) ? '<div class="secwrap"><div class="sh">Works Carried Out</div><div class="bx">'+esc(msWorks)+'</div></div>' : '';
   var msLimitationsH = (isMakeSafe && msLimitations) ? '<div class="secwrap"><div class="sh">Limitations &amp; Recommendations</div><div class="bx">'+esc(msLimitations)+'</div></div>' : '';
 
+  var additionalStructuresH = '';
+  if(!isMakeSafe){
+    var addlBlocks = (typeof parseAdditionalStructures === 'function') ? parseAdditionalStructures(f.aiAdditional || '') : [];
+    if(addlBlocks.length){
+      additionalStructuresH = addlBlocks.map(function(s){
+        return '<div class="secwrap"><div class="sh">' + esc((s.name || '').toUpperCase()) + '</div><div class="bx">' + esc(s.content) + '</div></div>';
+      }).join('');
+    }
+  }
+
   var photoH = pdfPhotos.length?'<div class="sh ph-head">SITE PHOTOGRAPHS</div><div style="margin-top:6px">'+photoRows+'</div>':'';
 
   var coverInfo = '';
@@ -6345,6 +6419,8 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
 
   '<div class="secwrap"><div class="sh">Conclusion</div>' +
   '<div class="bx">'+esc(conclusion||'')+'</div></div>' +
+
+  additionalStructuresH +
 
   photoH +
 
