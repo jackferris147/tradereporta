@@ -2696,7 +2696,7 @@ var CHECKLIST_ITEMS = {
 };
 
 function initPreInspect(){
-  document.querySelectorAll('.pi-options').forEach(function(group){
+  document.querySelectorAll('#secbody-preinspect .pi-options').forEach(function(group){
     var isMulti = group.dataset.multi === 'true';
     var groupKey = group.dataset.group;
     group.querySelectorAll('.pi-btn').forEach(function(btn){
