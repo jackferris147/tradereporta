@@ -607,6 +607,12 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
             oninput="setJobFactNumber('battenSpacingMm', this.value)">
         </div>
 
+        <div class="pi-group"><div class="pi-label">Batten Condition</div><div class="pi-options" data-jf="battenCondition">
+          <button type="button" class="pi-btn pi-btn--green" data-val="good" onclick="setJobFact('battenCondition','good')">Good</button>
+          <button type="button" class="pi-btn pi-btn--amber" data-val="fair" onclick="setJobFact('battenCondition','fair')">Fair</button>
+          <button type="button" class="pi-btn pi-btn--red" data-val="poor" onclick="setJobFact('battenCondition','poor')">Poor</button>
+        </div></div>
+
         <div class="pi-group"><div class="pi-label">Sarking Present</div><div class="pi-options" data-jf="sarkingPresent">
           <button type="button" class="pi-btn" data-val="yes" onclick="setJobFact('sarkingPresent','yes')">Yes</button>
           <button type="button" class="pi-btn" data-val="no" onclick="setJobFact('sarkingPresent','no')">No</button>
@@ -618,9 +624,10 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
           <button type="button" class="pi-btn" data-val="aircel" onclick="setJobFact('sarkingType','aircel')">Aircel</button>
         </div></div>
 
-        <div class="pi-group"><div class="pi-label">Insulation Present</div><div class="pi-options" data-jf="insulationPresent">
-          <button type="button" class="pi-btn" data-val="yes" onclick="setJobFact('insulationPresent','yes')">Yes</button>
-          <button type="button" class="pi-btn" data-val="no" onclick="setJobFact('insulationPresent','no')">No</button>
+        <div class="pi-group" id="jf-sarking-condition-group" style="display:none"><div class="pi-label">Sarking Condition</div><div class="pi-options" data-jf="sarkingCondition">
+          <button type="button" class="pi-btn pi-btn--green" data-val="good" onclick="setJobFact('sarkingCondition','good')">Good</button>
+          <button type="button" class="pi-btn pi-btn--amber" data-val="fair" onclick="setJobFact('sarkingCondition','fair')">Fair</button>
+          <button type="button" class="pi-btn pi-btn--red" data-val="poor" onclick="setJobFact('sarkingCondition','poor')">Poor</button>
         </div></div>
 
         <div class="pi-group">
@@ -668,17 +675,6 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
           <button type="button" class="pi-btn" data-val="overflow-valley" onclick="toggleJobFactMulti('entryPoints','overflow-valley')">Via overflowing valleys</button>
           <button type="button" class="pi-btn" data-val="cracked-tiles" onclick="toggleJobFactMulti('entryPoints','cracked-tiles')">Via cracked tiles</button>
           <button type="button" class="pi-btn" data-val="na" onclick="toggleJobFactMulti('entryPoints','na')">N/A</button>
-        </div></div>
-
-        <div class="pi-group"><div class="pi-label">Owner-Maintenance Defects (pick all that apply)</div><div class="pi-options" data-jf-multi="ownerDefects">
-          <button type="button" class="pi-btn" data-val="rust-fixings" onclick="toggleJobFactMulti('ownerDefects','rust-fixings')">Rusting screws/nails/fixings</button>
-          <button type="button" class="pi-btn" data-val="rust-sheets" onclick="toggleJobFactMulti('ownerDefects','rust-sheets')">Rusting sheets</button>
-          <button type="button" class="pi-btn" data-val="rust-flashings" onclick="toggleJobFactMulti('ownerDefects','rust-flashings')">Rusting flashings</button>
-          <button type="button" class="pi-btn" data-val="debris-gutters" onclick="toggleJobFactMulti('ownerDefects','debris-gutters')">Gutters with debris</button>
-          <button type="button" class="pi-btn" data-val="debris-valleys" onclick="toggleJobFactMulti('ownerDefects','debris-valleys')">Valleys with debris</button>
-          <button type="button" class="pi-btn" data-val="poor-workmanship" onclick="toggleJobFactMulti('ownerDefects','poor-workmanship')">Poor workmanship</button>
-          <button type="button" class="pi-btn" data-val="below-code-pitch" onclick="toggleJobFactMulti('ownerDefects','below-code-pitch')">Below-code pitch</button>
-          <button type="button" class="pi-btn" data-val="nil" onclick="toggleJobFactMulti('ownerDefects','nil')">NIL</button>
         </div></div>
 
         <div class="pi-group"><div class="pi-label">Asbestos Suspected</div><div class="pi-options" data-jf="asbestos">
@@ -2826,9 +2822,10 @@ function preInspectLabel(key, val){
 
 var JOB_FACTS_LABELS = {
   battenType: { timber:'Timber', metal:'Metal' },
+  battenCondition: { good:'Good', fair:'Fair', poor:'Poor' },
   sarkingPresent: { yes:'Yes', no:'No' },
   sarkingType: { sisalation:'Sisalation Foil', anticon:'Anticon Blanket', aircel:'Aircel' },
-  insulationPresent: { yes:'Yes', no:'No' },
+  sarkingCondition: { good:'Good', fair:'Fair', poor:'Poor' },
   asbestos: { yes:'Yes', no:'No' },
   heightSafety: { yes:'Yes', no:'No' },
   electricalHazards: { yes:'Yes', no:'No' },
@@ -2842,16 +2839,6 @@ var JOB_FACTS_LABELS = {
     'overflow-valley':'Via overflowing valleys',
     'cracked-tiles':'Via cracked tiles',
     'na':'N/A'
-  },
-  ownerDefects: {
-    'rust-fixings':'Rusting screws/nails/fixings',
-    'rust-sheets':'Rusting sheets',
-    'rust-flashings':'Rusting flashings',
-    'debris-gutters':'Gutters with debris',
-    'debris-valleys':'Valleys with debris',
-    'poor-workmanship':'Poor workmanship',
-    'below-code-pitch':'Below-code pitch',
-    'nil':'NIL'
   }
 };
 var PEN_LABELS = { whirlybirds:'whirlybirds', ventPipes:'vent pipes', skylights:'skylights', antennae:'antennae', chimneys:'chimneys' };
@@ -2869,7 +2856,14 @@ function setJobFact(key, val){
     jobFacts[key] = val;
   }
   renderJobFactsUI();
-  if(key === 'sarkingPresent') updateJobFactsConditionals();
+  if(key === 'sarkingPresent'){
+    if(jobFacts.sarkingPresent !== 'yes'){
+      if(jobFacts.sarkingType) jobFacts.sarkingType = '';
+      if(jobFacts.sarkingCondition) jobFacts.sarkingCondition = '';
+      renderJobFactsUI();
+    }
+    updateJobFactsConditionals();
+  }
   if(key === 'heightSafety') updateJobFactsConditionals();
   markEdited();
   autoSaveJob();
@@ -2918,7 +2912,7 @@ function toggleJobFactMulti(key, val){
 function renderJobFactsUI(){
   var host = document.getElementById('secbody-jobfacts');
   if(!host) return;
-  ['battenType','sarkingPresent','sarkingType','insulationPresent','asbestos','heightSafety','electricalHazards'].forEach(function(key){
+  ['battenType','battenCondition','sarkingPresent','sarkingType','sarkingCondition','asbestos','heightSafety','electricalHazards'].forEach(function(key){
     var row = host.querySelector('[data-jf="'+key+'"]');
     if(!row) return;
     var cur = jobFacts && jobFacts[key];
@@ -2926,7 +2920,7 @@ function renderJobFactsUI(){
       btn.classList.toggle('selected', btn.dataset.val === cur);
     });
   });
-  ['entryPoints','ownerDefects'].forEach(function(key){
+  ['entryPoints'].forEach(function(key){
     var row = host.querySelector('[data-jf-multi="'+key+'"]');
     if(!row) return;
     var arr = Array.isArray(jobFacts && jobFacts[key]) ? jobFacts[key] : [];
@@ -2952,8 +2946,11 @@ function renderJobFactsUI(){
 }
 
 function updateJobFactsConditionals(){
-  var sarkRow = document.getElementById('jf-sarking-type-group');
-  if(sarkRow) sarkRow.style.display = (jobFacts && jobFacts.sarkingPresent === 'yes') ? '' : 'none';
+  var sarkPresent = (jobFacts && jobFacts.sarkingPresent === 'yes');
+  var sarkTypeRow = document.getElementById('jf-sarking-type-group');
+  if(sarkTypeRow) sarkTypeRow.style.display = sarkPresent ? '' : 'none';
+  var sarkCondRow = document.getElementById('jf-sarking-condition-group');
+  if(sarkCondRow) sarkCondRow.style.display = sarkPresent ? '' : 'none';
   var hsRow = document.getElementById('jf-height-detail-group');
   if(hsRow) hsRow.style.display = (jobFacts && jobFacts.heightSafety === 'yes') ? '' : 'none';
   var entryRow = document.getElementById('jf-entry-group');
@@ -2976,14 +2973,13 @@ function restoreJobFacts(data){
 
 function jobFactsHasAny(){
   if(!jobFacts || typeof jobFacts !== 'object') return false;
-  var strKeys = ['battenType','sarkingPresent','sarkingType','insulationPresent','gutterType','downpipeType','asbestos','heightSafety','heightSafetyDetail','electricalHazards'];
+  var strKeys = ['battenType','battenCondition','sarkingPresent','sarkingType','sarkingCondition','gutterType','downpipeType','asbestos','heightSafety','heightSafetyDetail','electricalHazards'];
   for(var i = 0; i < strKeys.length; i++){
     var v = jobFacts[strKeys[i]];
     if(v != null && String(v).trim() !== '') return true;
   }
   if(jobFacts.battenSpacingMm != null && jobFacts.battenSpacingMm !== '' && !isNaN(parseFloat(jobFacts.battenSpacingMm))) return true;
   if(Array.isArray(jobFacts.entryPoints) && jobFacts.entryPoints.length) return true;
-  if(Array.isArray(jobFacts.ownerDefects) && jobFacts.ownerDefects.length) return true;
   if(jobFacts.pens && typeof jobFacts.pens === 'object'){
     var pkeys = Object.keys(PEN_LABELS);
     for(var j = 0; j < pkeys.length; j++){
@@ -3002,15 +2998,26 @@ function buildJobFactsPairs(source, jobType){
     if(value == null || value === '' || value === false) return;
     pairs.push({ label: label, value: String(value) });
   }
-  if(d.battenType) push('Battens', jobFactLabel('battenType', d.battenType) + (d.battenSpacingMm ? ' @ ' + d.battenSpacingMm + 'mm' : ''));
-  else if(d.battenSpacingMm) push('Batten Spacing', d.battenSpacingMm + 'mm');
+  if(d.battenType || d.battenSpacingMm || d.battenCondition){
+    var battenBits = [];
+    if(d.battenType) battenBits.push(jobFactLabel('battenType', d.battenType));
+    if(d.battenSpacingMm) battenBits.push('@ ' + d.battenSpacingMm + 'mm');
+    var battenMain = battenBits.join(' ');
+    if(d.battenCondition){
+      var condLabel = jobFactLabel('battenCondition', d.battenCondition);
+      battenMain = battenMain ? (battenMain + ' — ' + condLabel) : condLabel;
+    }
+    push(battenMain ? 'Battens' : '', battenMain);
+  }
   if(d.sarkingPresent === 'yes'){
-    push('Sarking', d.sarkingType ? jobFactLabel('sarkingType', d.sarkingType) : 'Present');
+    var sBits = [];
+    if(d.sarkingType) sBits.push(jobFactLabel('sarkingType', d.sarkingType));
+    else sBits.push('Present');
+    if(d.sarkingCondition) sBits.push('— ' + jobFactLabel('sarkingCondition', d.sarkingCondition));
+    push('Sarking', sBits.join(' '));
   } else if(d.sarkingPresent === 'no'){
     push('Sarking', 'None');
   }
-  if(d.insulationPresent === 'yes') push('Insulation', 'Present');
-  else if(d.insulationPresent === 'no') push('Insulation', 'None');
   if(d.gutterType) push('Gutters', d.gutterType);
   if(d.downpipeType) push('Downpipes', d.downpipeType);
   if(d.pens && typeof d.pens === 'object'){
@@ -3023,9 +3030,6 @@ function buildJobFactsPairs(source, jobType){
   }
   if(isLeakJob && Array.isArray(d.entryPoints) && d.entryPoints.length){
     push('Point of Water Entry', d.entryPoints.map(function(v){ return jobFactLabel('entryPoints', v); }).join(', '));
-  }
-  if(Array.isArray(d.ownerDefects) && d.ownerDefects.length){
-    push('Owner-Maintenance Defects', d.ownerDefects.map(function(v){ return jobFactLabel('ownerDefects', v); }).join(', '));
   }
   if(d.asbestos === 'yes') push('Asbestos', 'Suspected — testing required');
   if(d.heightSafety === 'yes'){
