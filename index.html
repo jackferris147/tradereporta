@@ -605,6 +605,31 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,sans-serif;background
           </label>
         </div>
 
+        <div id="leak-facts-bar" style="display:none;margin-bottom:16px;background:#FAFAFA;border:1px solid #E5E7EB;border-radius:10px;padding:12px 14px">
+          <div class="pi-label" style="margin-bottom:10px">Leak Quick Facts</div>
+          <div style="margin-bottom:10px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6B7280;margin-bottom:6px">Source</div>
+            <div class="pi-options" id="leak-src-opts">
+              <button type="button" class="pi-btn" data-val="confirmed" onclick="setLeakFact('source','confirmed')">Confirmed</button>
+              <button type="button" class="pi-btn" data-val="suspected" onclick="setLeakFact('source','suspected')">Suspected</button>
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6B7280;margin-bottom:6px">Internal damage present?</div>
+            <div class="pi-options" id="leak-int-opts">
+              <button type="button" class="pi-btn" data-val="yes" onclick="setLeakFact('internalDamage','yes')">Yes</button>
+              <button type="button" class="pi-btn" data-val="no" onclick="setLeakFact('internalDamage','no')">No</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#6B7280;margin-bottom:6px">Leak status</div>
+            <div class="pi-options" id="leak-stat-opts">
+              <button type="button" class="pi-btn" data-val="active" onclick="setLeakFact('status','active')">Active</button>
+              <button type="button" class="pi-btn" data-val="historic" onclick="setLeakFact('status','historic')">Historic (dried)</button>
+            </div>
+          </div>
+        </div>
+
         <div id="structure-bar" style="margin-bottom:16px">
           <div class="pi-label">Currently Inspecting</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1620,11 +1645,9 @@ var guidedItems = {
     { key: 'sarking', label: 'Sarking', hint: 'Present, condition' }
   ],
   leak: [
-    { key: 'entry', label: 'Entry Point', hint: 'Where water enters and how it travelled internally' },
-    { key: 'affected', label: 'Affected Areas', hint: 'Rooms and areas affected, extent of damage' },
-    { key: 'roofarea', label: 'Roof Around Area of Concern', hint: 'Condition around the suspected entry' },
-    { key: 'general', label: 'General Roof Condition', hint: 'Overall state of the roof' },
-    { key: 'source', label: 'Source Confirmed', hint: 'Confirmed not assumed' }
+    { key: 'internal',  label: 'Internal Damage',       hint: 'What you see inside on arrival — rooms/areas affected and the extent of the damage.' },
+    { key: 'entry',     label: 'Water Entry & Source',  hint: 'On the roof — where water is entering, how it travelled, how you CONFIRMED the source (not just suspected), and the condition of the roof around that area.' },
+    { key: 'condition', label: 'Roof Condition',        hint: 'General condition of the roof overall, and anything else relevant to the leak or its cause.' }
   ],
   smallStructure: [
     { key: 'pitch',     label: 'Pitch & Look',  hint: 'Roof pitch, what it looks like, profile/material' },
@@ -1647,6 +1670,107 @@ var guidedMode = true;
 var guidedData = {};
 var currentStepIndex = 0;
 var lastGuidedCategory = null;
+var leakFacts = { source: '', internalDamage: '', status: '' };
+
+function isLeakInternalHidden(){
+  return jtype === 'leak' && leakFacts && leakFacts.internalDamage === 'no';
+}
+
+function leakFactsHasAny(){
+  if(!leakFacts) return false;
+  return !!(leakFacts.source || leakFacts.internalDamage || leakFacts.status);
+}
+
+function leakFactsSummary(){
+  if(!leakFactsHasAny()) return '';
+  var parts = [];
+  if(leakFacts.source === 'confirmed') parts.push('Source confirmed');
+  else if(leakFacts.source === 'suspected') parts.push('Source suspected (not yet confirmed)');
+  if(leakFacts.status === 'active') parts.push('Active leak');
+  else if(leakFacts.status === 'historic') parts.push('Historic / dried leak');
+  if(leakFacts.internalDamage === 'yes') parts.push('Internal damage present');
+  else if(leakFacts.internalDamage === 'no') parts.push('No internal damage');
+  return parts.join(' · ');
+}
+
+function renderLeakFactsUI(){
+  var groups = [
+    { key: 'source', selector: '#leak-src-opts' },
+    { key: 'internalDamage', selector: '#leak-int-opts' },
+    { key: 'status', selector: '#leak-stat-opts' }
+  ];
+  groups.forEach(function(g){
+    var row = document.querySelector(g.selector);
+    if(!row) return;
+    var current = leakFacts && leakFacts[g.key];
+    row.querySelectorAll('.pi-btn').forEach(function(btn){
+      btn.classList.toggle('selected', btn.dataset.val === current);
+    });
+  });
+}
+
+function updateLeakFactsVisibility(){
+  var bar = document.getElementById('leak-facts-bar');
+  if(!bar) return;
+  bar.style.display = (jtype === 'leak') ? 'block' : 'none';
+  if(jtype === 'leak') renderLeakFactsUI();
+}
+
+function setLeakFact(key, val){
+  if(!leakFacts) leakFacts = { source:'', internalDamage:'', status:'' };
+  if(leakFacts[key] === val){
+    leakFacts[key] = '';
+  } else {
+    leakFacts[key] = val;
+  }
+  renderLeakFactsUI();
+  if(key === 'internalDamage'){
+    currentStepIndex = 0;
+    renderGuidedStep();
+    updateGuidedProgress();
+  }
+  markEdited();
+  autoSaveJob();
+}
+
+function resetLeakFacts(){
+  leakFacts = { source:'', internalDamage:'', status:'' };
+  renderLeakFactsUI();
+}
+
+function migrateLeakGuidedData(gd){
+  if(!gd || typeof gd !== 'object') return gd || {};
+  var LEGACY = ['entry','affected','roofarea','general','source','internal','condition'];
+  var out = {};
+  Object.keys(gd).forEach(function(structName){
+    var s = gd[structName] || {};
+    var newS = {};
+    function mergeInto(target, src){
+      if(!src) return target;
+      target = target || {};
+      var tt = (target.transcript || '').trim();
+      var st = (src.transcript || '').trim();
+      if(st) target.transcript = tt ? (tt + '\n\n' + st) : st;
+      var te = (target.extra || '').trim();
+      var se = (src.extra || '').trim();
+      if(se) target.extra = te ? (te + '\n\n' + se) : se;
+      if(src.skipped && target.skipped == null) target.skipped = false;
+      return target;
+    }
+    if(s.entry)     newS.entry     = Object.assign({}, s.entry);
+    if(s.roofarea)  newS.entry     = mergeInto(newS.entry, s.roofarea);
+    if(s.source)    newS.entry     = mergeInto(newS.entry, s.source);
+    if(s.affected)  newS.internal  = Object.assign({}, s.affected);
+    if(s.internal)  newS.internal  = mergeInto(newS.internal, s.internal);
+    if(s.general)   newS.condition = Object.assign({}, s.general);
+    if(s.condition) newS.condition = mergeInto(newS.condition, s.condition);
+    Object.keys(s).forEach(function(k){
+      if(LEGACY.indexOf(k) === -1) newS[k] = s[k];
+    });
+    out[structName] = newS;
+  });
+  return out;
+}
 
 function deriveMainMaterial(){
   var rt = preInspectData && preInspectData.roofType;
@@ -1733,7 +1857,12 @@ function hasAnyGuidedTranscripts(){
 }
 
 function itemsForStructure(name){
-  if(jtype === 'leak') return guidedItems.leak;
+  if(jtype === 'leak'){
+    if(isLeakInternalHidden()){
+      return guidedItems.leak.filter(function(it){ return it.key !== 'internal'; });
+    }
+    return guidedItems.leak;
+  }
   if(jtype === 'makesafe') return [];
   var type = structureTypeOf(name);
   if(type === 'carport' || type === 'patio') return guidedItems.smallStructure;
@@ -2286,6 +2415,16 @@ function backToGuidedSteps(){
 function buildGuidedTranscript(){
   if(jtype === 'makesafe') return '';
   var lines = [];
+  if(jtype === 'leak' && leakFactsHasAny()){
+    var factLines = ['LEAK FACTS:'];
+    if(leakFacts.source === 'confirmed') factLines.push('- Source: CONFIRMED (definitive language in the report).');
+    else if(leakFacts.source === 'suspected') factLines.push('- Source: SUSPECTED — not yet confirmed. Use language that flags this as requiring further investigation; do not state cause definitively.');
+    if(leakFacts.status === 'active') factLines.push('- Leak status: ACTIVE — treat urgency of recommendations accordingly.');
+    else if(leakFacts.status === 'historic') factLines.push('- Leak status: HISTORIC (dried on arrival). Reflect this in urgency.');
+    if(leakFacts.internalDamage === 'yes') factLines.push('- Internal damage: present (see Internal Damage input).');
+    else if(leakFacts.internalDamage === 'no') factLines.push('- Internal damage: NONE observed. Do not fabricate internal damage. The internal step was omitted.');
+    lines.push(factLines.join('\n'));
+  }
   structures.forEach(function(structure){
     var items = itemsForStructure(structure);
     if(!items || !items.length) return;
@@ -2362,6 +2501,7 @@ function resetGuidedState(){
   currentStructure = 'Main Roof';
   structureMaterials = {};
   structureTypes = {};
+  leakFacts = { source:'', internalDamage:'', status:'' };
   guidedData = {};
   currentStepIndex = 0;
   guidedMode = true;
@@ -2379,6 +2519,7 @@ function initGuidedForJob(){
   var chk = document.getElementById('freeform-toggle');
   if(chk) chk.checked = !guidedMode;
   updateGuidedVisibility();
+  updateLeakFactsVisibility();
   updateStructureMaterialBtn();
   renderGuidedStep();
   updateGuidedVerifySummary();
@@ -2807,6 +2948,7 @@ function setType(t){
   updateEventDamageVisibility();
   if(typeof updateChecklistVisibility === 'function') updateChecklistVisibility();
   if(typeof updateGuidedVisibility === 'function') updateGuidedVisibility();
+  if(typeof updateLeakFactsVisibility === 'function') updateLeakFactsVisibility();
   if(typeof renderGuidedStep === 'function') renderGuidedStep();
 }
 
@@ -3310,6 +3452,7 @@ function getJobData(){
     currentStructure: currentStructure,
     structureMaterials: JSON.parse(JSON.stringify(structureMaterials || {})),
     structureTypes: JSON.parse(JSON.stringify(structureTypes || {})),
+    leakFacts: JSON.parse(JSON.stringify(leakFacts || {})),
     guidedMode: !!guidedMode,
     guidedData: JSON.parse(JSON.stringify(guidedData || {})),
     updatedAt: Date.now(),
@@ -4006,7 +4149,9 @@ function openJob(id){
   currentStructure = j.currentStructure && structures.indexOf(j.currentStructure) !== -1 ? j.currentStructure : structures[0];
   structureMaterials = (j.structureMaterials && typeof j.structureMaterials === 'object') ? JSON.parse(JSON.stringify(j.structureMaterials)) : {};
   structureTypes = (j.structureTypes && typeof j.structureTypes === 'object') ? JSON.parse(JSON.stringify(j.structureTypes)) : {};
+  leakFacts = (j.leakFacts && typeof j.leakFacts === 'object') ? Object.assign({ source:'', internalDamage:'', status:'' }, j.leakFacts) : { source:'', internalDamage:'', status:'' };
   guidedData = j.guidedData && typeof j.guidedData === 'object' ? JSON.parse(JSON.stringify(j.guidedData)) : {};
+  if(jtype === 'leak'){ guidedData = migrateLeakGuidedData(guidedData); }
   guidedMode = (j.guidedMode === undefined) ? true : !!j.guidedMode;
   currentStepIndex = 0;
   initGuidedForJob();
@@ -4309,6 +4454,7 @@ function runReportGen(transcript, opts){
       '- Carport, Shed and Patio structures are small secondary structures. Cover them CONCISELY (typically 1-3 short findings each) - NOT the full section treatment the main roof gets. If an item on a secondary structure has nothing notable, it is fine to omit it.\n' +
       '- Group findings BY STRUCTURE in the Findings section. When items relate to a non-main structure (e.g. Garage, Rear Carport, Shed), include the structure name in the Area column so it reads as separate rows (e.g. "Ridge Cap - Main Roof", "Sheets - Rear Carport Awning"). For items on the main structure only, structure name is optional.\n' +
       '- Information from any labelled item can flow into Findings, Event Damage, or Maintenance wherever it gives useful context - do not treat labels as rigid section mappings.\n' +
+      (jtype === 'leak' ? '- LEAK jobs use a lean 3-step input: "Internal Damage" (inside on arrival), "Water Entry & Source" (on the roof - where water enters, how it travelled, how the source was confirmed, and roof condition around it), and "Roof Condition" (general roof condition and anything else relevant). A LEAK FACTS block above tells you whether the source was Confirmed vs Suspected, whether the leak is Active vs Historic, and whether internal damage is present. Reflect those facts in ENTRY and CAUSATION language: Confirmed source = definitive causation; Suspected source = flag as requiring further investigation and avoid definitive cause statements. If internal damage is marked NONE observed, do not fabricate any. Do not describe more than what the transcript covers.\n' : '') +
       '- Skipped items are omitted entirely from the transcript. Do NOT invent details for items that are not present.\n\n';
   }
   var userMsg = 'Inspection type: ' + typeLbl + ' | Address: ' + addr + '\n\n' + contextBlock + 'Transcript:\n' + clean;
@@ -5579,6 +5725,21 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
     roofDetailsH = '<div class="secwrap"><div class="sh">Roof Details</div><table><tbody>'+rdRows+'</tbody></table></div>';
   }
 
+  var leakFactsH = '';
+  if(isLeak){
+    var lf = f.leakFacts || {};
+    var lfBits = [];
+    if(lf.source === 'confirmed') lfBits.push('Source confirmed');
+    else if(lf.source === 'suspected') lfBits.push('Source suspected — further investigation required');
+    if(lf.status === 'active') lfBits.push('Active leak');
+    else if(lf.status === 'historic') lfBits.push('Historic (dried on arrival)');
+    if(lf.internalDamage === 'yes') lfBits.push('Internal damage present');
+    else if(lf.internalDamage === 'no') lfBits.push('No internal damage observed');
+    if(lfBits.length){
+      leakFactsH = '<div class="secwrap"><div class="sh">Leak Facts</div><div class="bx">' + esc(lfBits.join(' · ')) + '</div></div>';
+    }
+  }
+
   var findLines = (findings||'').split('\n').filter(function(r){ return r.trim(); });
   var findRows = findLines.map(function(line,fi){
     var first = line.indexOf('|');
@@ -5784,6 +5945,8 @@ function buildReportInner(scope,findings,entry,causation,maint,recs,conclusion,p
   '<table><tbody>'+kvRows+'</tbody></table></div>' +
 
   roofDetailsH +
+
+  leakFactsH +
 
   '<div class="sh">Scope of Works</div>' +
   '<div class="bx">'+esc(scope||('As requested, '+brand.company+' attended site to '+(isMakeSafe?'carry out emergency make safe works.':'carry out a comprehensive inspection.')))+'</div>' +
